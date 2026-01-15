@@ -1,0 +1,44 @@
+(define (problem Cube_Manipulation)
+  (:domain genesis_env)
+  (:language "Move the cube to target position (0.0, 0.5, 0.3)")
+
+  (:regions
+    (cube_init_region
+      (:target workspace
+        (:ranges (
+          (0.6 0.7 -0.05 0.05 0.0 0.05)  ; 初始区域范围 (x_min, x_max, y_min, y_max, z_min, z_max)
+        ))
+        (:yaw_rotation ((0.0 0.0)))
+      )
+    )
+    (target_region
+      (:target workspace
+        (:ranges (
+          (-0.05 0.05 0.45 0.55 0.25 0.35)  ; 目标区域范围 (±0.05m around target)
+        ))
+        (:yaw_rotation ((0.0 0.0)))
+      )
+    )
+  )
+
+  (:objects
+    cube_1 - cube
+    robot_1 - franka_robot
+  )
+
+  (:obj_of_interest
+    cube_1
+  )
+
+  (:init
+    (On cube_1 cube_init_region)  ; 初始位置在(0.65, 0.0, 0.02)附近
+    (InRoom robot_1 workspace)
+  )
+
+  (:goal
+    (And
+      (On cube_1 target_region)  ; 目标位置在(0.0, 0.5, 0.3)附近
+      (Stable cube_1)            ; 需要稳定放置
+    )
+  )
+)

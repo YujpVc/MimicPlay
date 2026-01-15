@@ -1,0 +1,6 @@
+def is_success(self):
+    cube_entity = self.scene.entities[2]  # 立方体
+    cube_pos = cube_entity.get_pos().cpu().numpy().squeeze()
+    target_pos = np.array([0.5, 0.0, 0.02])
+    distance = np.linalg.norm(cube_pos - target_pos)
+    return {"task": distance < 0.02}  # 容差设为 0.02 米

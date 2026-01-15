@@ -1,0 +1,27 @@
+(define (problem tabletop-cleaning-task)
+  (:domain libero_kitchen_tabletop_manipulation)
+
+  (:objects
+    panda - robot
+    mug1 - mug
+    book1 - book
+    pen1 - pen
+    bin0 - receptacle
+    table0 - surface
+  )
+
+  (:init
+    (on mug1 table0)
+    (on book1 table0)
+    (on pen1 table0)
+    (receptacle bin0)
+    (workspace main_table table0)
+    (region bin_region bin0)
+  )
+
+  (:goal
+    (inside mug1 bin0)
+    (inside book1 bin0)
+    (inside pen1 bin0)
+  )
+)
