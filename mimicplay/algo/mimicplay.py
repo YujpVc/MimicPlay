@@ -299,17 +299,14 @@ class Lowlevel_GPT_mimicplay(BC_RNN):
             input_batch (dict): processed and filtered batch that
                 will be used for training
         """
+        # IMPORTANT:
+        # Do NOT call ObsUtils.process_obs_dict here.
+        # robomimic's Algo.postprocess_batch_for_training() will process observations exactly once.
+        # If we process here too, images become CHW and will fail the second processing pass.
         input_batch = dict()
         input_batch["obs"] = batch["obs"]
-
-        key_list = copy.deepcopy(list(input_batch["obs"].keys()))
-        for key in key_list:
-            input_batch["obs"][key] = input_batch["obs"][key]
-
         input_batch["goal_obs"] = batch["goal_obs"]
-
         input_batch["actions"] = batch["actions"]
-
         return TensorUtils.to_device(TensorUtils.to_float(input_batch), self.device)
 
     def _forward_training(self, batch):
@@ -478,17 +475,12 @@ class Baseline_GPT_from_scratch(BC_RNN):
             input_batch (dict): processed and filtered batch that
                 will be used for training
         """
+        # IMPORTANT:
+        # Do NOT call ObsUtils.process_obs_dict here - see note in Lowlevel_GPT_mimicplay.
         input_batch = dict()
         input_batch["obs"] = batch["obs"]
-
-        key_list = copy.deepcopy(list(input_batch["obs"].keys()))
-        for key in key_list:
-            input_batch["obs"][key] = input_batch["obs"][key]
-
         input_batch["goal_obs"] = batch["goal_obs"]
-
         input_batch["actions"] = batch["actions"]
-
         return TensorUtils.to_device(TensorUtils.to_float(input_batch), self.device)
 
     def _forward_training(self, batch):
@@ -651,16 +643,12 @@ class BC_RNN_GMM(BC_RNN):
             input_batch (dict): processed and filtered batch that
                 will be used for training
         """
+        # IMPORTANT:
+        # Do NOT call ObsUtils.process_obs_dict here - robomimic will do it in postprocess_batch_for_training.
         input_batch = dict()
         input_batch["obs"] = batch["obs"]
-
-        key_list = copy.deepcopy(list(input_batch["obs"].keys()))
-        for key in key_list:
-            input_batch["obs"][key] = input_batch["obs"][key]
-
         input_batch["goal_obs"] = batch["goal_obs"]
         input_batch["actions"] = batch["actions"]
-
         return TensorUtils.to_device(TensorUtils.to_float(input_batch), self.device)
 
     def _forward_training(self, batch):

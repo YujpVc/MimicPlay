@@ -92,8 +92,8 @@ class ForceDimensionExpert:
         self.pos_prev_served = np.zeros(3)
         
         # Absolute Smoothing State
-        # We store the SMOOTHED absolute rotation from the previous step
-        self.rot_abs_smoothed_prev = R.from_matrix(np.eye(3))
+        # We store the initial rotation (after auto-centering) as the reference
+        self.rot_ref = R.from_matrix(np.eye(3))
         
         # Smoothing filters for position
         self.pos_smoothed = np.zeros(3)
@@ -124,8 +124,8 @@ class ForceDimensionExpert:
         with self.lock:
             # 更新 prev 为 归中后 的状态
             self.pos_prev_served = self.latest_pos.copy()
-            # Initialize smoothed rotation to current actual rotation
-            self.rot_abs_smoothed_prev = R.from_matrix(self.latest_rot.copy())
+            # Initialize reference rotation to current actual rotation
+            self.rot_ref = R.from_matrix(self.latest_rot.copy())
             self.pos_smoothed = self.latest_pos.copy() * self.scale_pos
             self.pos_initialized = True
             self.rot_initialized = True
@@ -246,29 +246,30 @@ class ForceDimensionExpert:
         else:
             smoothed_pos_input = raw_pos_input
         
-        # --- ROTATION MAPPING (ABSOLUTE SMOOTHING -> RELATIVE DELTA) ---
+        # --- ROTATION MAPPING (ABSOLUTE REFERENCE) ---
         # 1. Get current absolute rotation
         quat_curr = R.from_matrix(mat_curr)
         
-        # 2. Smooth the ABSOLUTE rotation first
-        if self.smooth_rot and self.rot_initialized:
-            # SLERP from previous smoothed absolute to current raw absolute
-            key_rots = R.concatenate([self.rot_abs_smoothed_prev, quat_curr])
-            slerp = Slerp([0, 1], key_rots)
-            quat_abs_smoothed = slerp(self.smooth_alpha)
+        # 2. Calculate Difference from INITIAL REFERENCE to CURRENT
+        # R_diff = R_curr * inv(R_ref)
+        # This gives the absolute orientation change relative to the start
+        R_diff = quat_curr * self.rot_ref.inv()
+        
+        # 3. Convert to Euler angles (representing the total rotation from start)
+        raw_euler = R_diff.as_euler('xyz') * self.scale_rot
+        
+        # 4. Apply Smoothing if enabled (Low-pass filter on the output angles)
+        if self.smooth_rot:
+             if not hasattr(self, 'euler_smoothed'):
+                 self.euler_smoothed = np.zeros(3)
+                 
+             # Exponential Moving Average
+             self.euler_smoothed = (self.smooth_alpha * raw_euler + 
+                                   (1 - self.smooth_alpha) * self.euler_smoothed)
+             delta_euler = self.euler_smoothed
         else:
-            quat_abs_smoothed = quat_curr
-            self.rot_initialized = True
+             delta_euler = raw_euler
 
-        # 3. Calculate Delta from PREVIOUS SMOOTHED to CURRENT SMOOTHED
-        # R_diff = R_curr_smooth @ inv(R_prev_smooth)
-        # This gives a consistent velocity that doesn't amplify noise
-        R_diff = quat_abs_smoothed * self.rot_abs_smoothed_prev.inv()
-        delta_euler = R_diff.as_euler('xyz') * self.scale_rot
-        
-        # Update state for next step
-        self.rot_abs_smoothed_prev = quat_abs_smoothed
-        
         # Deadzones
         if np.linalg.norm(smoothed_pos_input) < self.pos_deadzone:
             smoothed_pos_input[:] = 0.0
@@ -302,6 +303,9 @@ class ForceDimensionExpert:
         action[3:6] = rot_action_normalized
         
         # Gripper
+        # Invert gripper logic if needed: 
+        # Currently: < 16 (Closed) -> -1.0, >= 16 (Open) -> 1.0
+        # This matches standard convention (-1 = close, 1 = open)
         if gripper_angle < 16:
             action[6] = -1.0 
         else:

@@ -156,13 +156,13 @@
             "gmm_min_std": 0.0001,
             "dropout": 0.1,
             "trained_highlevel_planner": "",
-            "eval_goal_img_window": 30,
-            "eval_max_goal_img_iter": 5
+            "eval_goal_img_window": 5,
+            "eval_max_goal_img_iter": 25
         },
         "playdata": {
             "enabled": true,
-            "goal_image_range": [100, 200],
-            "eval_goal_gap": 150
+            "goal_image_range": [20, 40],
+            "eval_goal_gap": 30
         }
     },
     "observation": {

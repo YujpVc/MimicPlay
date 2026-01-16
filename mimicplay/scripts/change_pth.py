@@ -1,30 +1,24 @@
 import torch
+import json
 
-# 加载模型
-model_path = '/home/yujp/MimicPlay/trained_models_lowlevel/test/lowlevel_model_epoch_950.pth'
-output_txt_path = '/home/yujp/MimicPlay/trained_models_lowlevel/test/lowlevel_model_epoch_950.txt'
-content = torch.load(model_path, map_location='cpu')
+# 加载 .pth 文件
+file_path = "/home/yujp/Genesis/scripts/XBOX_control/dataCollect/demo/Trained_model_0610/lowlevel/test/20250609070322/models/model_epoch_1052_best_validation_-43.54394798278808.pth"
+data = torch.load(file_path)
 
-# 检查 keys
-print("Keys in the model:", content.keys())
+# 检查 'config' 的类型
+if 'config' in data and isinstance(data['config'], str):
+    # 将 JSON 字符串解析为字典
+    config_dict = json.loads(data['config'])
 
-# 检查是否包含路径信息
-search_key = 'checkpoints/highlevel_model_epoch_357_best_validation_-65.05948219299316.pth'
-contains_path = search_key in str(content)
-print(f"Does the model contain the path '{search_key}'? {contains_path}")
+    # 修改 `trained_highlevel_planner` 的值
+    config_dict['algo']['lowlevel']['trained_highlevel_planner'] = "/home/yujp/Genesis/scripts/XBOX_control/dataCollect/demo/Trained_model_0610/highlevel/test/20250608200627/models/model_epoch_101_best_validation_-68.45099143981933.pth"
 
-# 如果 'model' 键存在，检查其内容
-if 'model' in content:
-    # print("Content under 'model':", content['model'])
-    pass
+    # 将字典转换回 JSON 字符串
+    data['config'] = json.dumps(config_dict, indent=4)
+
+    # 保存修改后的文件
+    new_file_path = file_path
+    torch.save(data, new_file_path)
+    print(f"文件已修改并保存到: {new_file_path}")
 else:
-    print("No 'model' key found in the checkpoint.")
-    pass
-
-# 将内容转换为字符串并保存为 .txt 文件
-with open(output_txt_path, 'w') as f:
-    for key, value in content.items():
-        f.write(f"Key: {key}\n")
-        f.write(f"Value: {str(value)}\n\n")
-
-print(f"模型内容已保存为文本文件：{output_txt_path}")
+    print("'config' 不存在或不是字符串，无法处理。")

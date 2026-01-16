@@ -13,7 +13,7 @@ import numpy as np
 import argparse
 
 # Define constants
-POINT_GAP = 15
+POINT_GAP = 5
 FUTURE_POINTS_COUNT = 10
 
 def get_future_points(arr):

@@ -33,6 +33,9 @@ from collections import OrderedDict
 import torch
 from torch.utils.data import DataLoader
 
+sys.path.append("/home/yujp/robosuite")
+sys.path.append("/home/yujp/robomimic")
+
 import robomimic.utils.train_utils as TrainUtils
 import robomimic.utils.torch_utils as TorchUtils
 import robomimic.utils.obs_utils as ObsUtils
@@ -107,7 +110,7 @@ def train(config, device):
             if args.bddl_file is not None:
                 env_meta["env_kwargs"]['bddl_file_name'] = args.bddl_file
 
-            print(env_meta)
+            print(f"==========================env_meta is {env_meta}==========================")
 
             env = EnvUtils.create_env_from_metadata(
                 env_meta=env_meta,
@@ -116,6 +119,12 @@ def train(config, device):
                 render_offscreen=config.experiment.render_video,
                 use_image_obs=shape_meta["use_images"],
             )
+
+            if args.condition_file is not None:
+                env.condition_file = args.condition_file
+                env._load_condition_file()  # 手动调用加载函数
+                print(f"强制设置 condition_file: {env.condition_file}")
+
             envs[env.name] = env
 
     # setup for a new training run
@@ -298,9 +307,16 @@ def train(config, device):
 
         # Only keep saved videos if the ckpt should be saved (but not because of validation score)
         should_save_video = (should_save_ckpt and (ckpt_reason != "valid")) or config.experiment.keep_all_videos
+        # if video_paths is not None and not should_save_video:
+        #     for env_name in video_paths:
+        #         os.remove(video_paths[env_name])
         if video_paths is not None and not should_save_video:
             for env_name in video_paths:
-                os.remove(video_paths[env_name])
+                video_path = video_paths[env_name]
+                if os.path.exists(video_path):
+                    os.remove(video_path)
+                else:
+                    print(f"Warning: Did not find video to delete: {video_path}")
 
         # Save model checkpoints based on conditions (success rate, validation loss, etc)
         if should_save_ckpt:
@@ -339,6 +355,9 @@ def main(args):
 
     if args.name is not None:
         config.experiment.name = args.name
+
+    if args.output_dir is not None:
+        config.train.output_dir = args.output_dir
 
     # get torch device
     device = TorchUtils.get_torch_device(try_to_use_cuda=config.train.cuda)
@@ -428,6 +447,21 @@ if __name__ == "__main__":
         "--debug",
         action='store_true',
         help="set this flag to run a quick training run for debugging purposes"
+    )
+
+    # 在 argparse.ArgumentParser() 中添加以下参数
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default=None,
+        help="(optional) path to the output directory where logs and checkpoints will be saved"
+    )
+
+    parser.add_argument(
+        "--condition_file",
+        type=str,
+        default=None,
+        help="(optional) path to the file defining the task's symbolic goal",
     )
 
     args = parser.parse_args()

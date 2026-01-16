@@ -17,7 +17,7 @@ def copy_attributes(source, target):
 
 
 # Path to your folder containing the hdf5 files
-folder_path = "your_robosuite_path/robosuite/robosuite/models/assets/demonstrations/playdata"
+folder_path = "/home/yujp/Genesis/scripts/XBOX_control/dataCollect/demo/demo_multitask_cube"
 
 # List all hdf5 files in the directory
 hdf5_files = [f for f in os.listdir(folder_path) if f.endswith('.hdf5')]

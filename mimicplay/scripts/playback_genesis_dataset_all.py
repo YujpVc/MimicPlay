@@ -32,6 +32,8 @@ Args:
     first (bool): if flag is provided, use first frame of each episode for playback
         instead of the entire episode. Useful for visualizing task initializations.
 
+    run_all (bool): if flag is provided, generates four videos for different views and modes
+
     control_freq (int): if provided, frequency to step the environment at, in Hz.
         This is used to add sleeps to open-loop action playback.
 
@@ -56,6 +58,9 @@ Example usage below:
     python playback_robomimic_dataset.py --dataset /path/to/dataset.hdf5 \
         --first --render_image_names agentview \
         --video_path /tmp/dataset_task_inits.mp4
+
+    # generate all four videos (hand image obs, agentview image obs, agentview state, hand state)
+    python playback_robomimic_dataset.py --dataset /path/to/dataset.hdf5 --run_all
 """
 
 import os
@@ -65,6 +70,7 @@ import argparse
 import imageio
 import numpy as np
 import time
+import copy
 
 import robomimic
 import robomimic.utils.obs_utils as ObsUtils
@@ -206,6 +212,67 @@ def playback_trajectory_with_obs(
         if first:
             break
 
+def run_multiple_outputs(args):
+    """运行多个输出配置，生成四个视频"""
+    # 创建输出目录
+    if args.video_path is not None:
+        output_dir = os.path.dirname(args.video_path)
+        os.makedirs(output_dir, exist_ok=True)
+    else:
+        output_dir = os.path.dirname(args.dataset)
+
+    # 如果数据集路径是目录，使用目录名作为前缀
+    dataset_dir = os.path.dirname(args.dataset)
+    if dataset_dir:
+        prefix = os.path.basename(dataset_dir) + "_"
+    else:
+        prefix = ""
+
+    # 四个视频的配置
+    configs = [
+        {
+            "use_obs": True,
+            "use_actions": False,  # 使用观测，所以不使用动作回放
+            "render_image_names": ["robot0_eye_in_hand_image"],
+            "video_name": prefix + "hand_image_obs_replay.mp4"
+        },
+        {
+            "use_obs": True,
+            "use_actions": False,
+            "render_image_names": ["agentview_image"],
+            "video_name": prefix + "agentview_image_obs_replay.mp4"
+        },
+        {
+            "use_obs": False,
+            "use_actions": True,   # 使用动作回放
+            "render_image_names": ["agentview_image"],
+            "video_name": prefix + "agentview_state_replay.mp4"
+        },
+        {
+            "use_obs": False,
+            "use_actions": True,
+            "render_image_names": ["robot0_eye_in_hand_image"],
+            "video_name": prefix + "hand_state_replay.mp4"
+        }
+    ]
+
+    for config in configs:
+        video_path = os.path.join(output_dir, config["video_name"])
+        print(f"\nGenerating video: {video_path}")
+
+        # 创建新参数副本
+        new_args = copy.deepcopy(args)
+        new_args.use_obs = config["use_obs"]
+        new_args.use_actions = config["use_actions"]
+        new_args.render_image_names = config["render_image_names"]
+        new_args.video_path = video_path
+        new_args.render = False  # 禁用屏幕渲染以避免冲突
+
+        # 调用播放函数
+        playback_dataset(new_args)
+
+        print(f"Completed: {video_path}")
+
 def playback_dataset(args):
     # some arg checking
     write_video = (args.video_path is not None)
@@ -262,6 +329,8 @@ def playback_dataset(args):
     # maybe dump video
     video_writer = None
     if write_video:
+        print(f"Creating video at: {args.video_path}")
+        os.makedirs(os.path.dirname(args.video_path), exist_ok=True)
         video_writer = imageio.get_writer(args.video_path, fps=20)
 
     for ind in range(len(demos)):
@@ -312,6 +381,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset",
         type=str,
+        required=True,
         help="path to hdf5 dataset",
     )
     parser.add_argument(
@@ -391,6 +461,22 @@ if __name__ == "__main__":
         help="use first frame of each episode",
     )
 
-    args = parser.parse_args()
-    playback_dataset(args)
+    # Option to generate all four videos
+    parser.add_argument(
+        "--run_all",
+        action='store_true',
+        help="if set, generates four videos for different views and modes",
+    )
 
+    args = parser.parse_args()
+
+    # 确保数据集参数是必需的
+    if args.dataset is None:
+        raise ValueError("--dataset argument is required")
+
+    if args.run_all:
+        print("\nGenerating all four videos...")
+        run_multiple_outputs(args)
+        print("\nCompleted generation of all four videos.")
+    else:
+        playback_dataset(args)

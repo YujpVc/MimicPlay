@@ -25,9 +25,20 @@ def replace_relative_path(xml_string):
     @param xml_string, input xml string from model_file fields of hdf5 file
     @return updated xml string with absolute path
     """
-    tree = ET.fromstring(xml_string)
+    if not xml_string:
+        return xml_string
+
+    try:
+        tree = ET.fromstring(xml_string)
+    except ET.ParseError:
+        # Return original string if it's not valid XML (e.g. empty or dummy string)
+        return xml_string
+
     root = tree
     asset = root.find("asset")
+    if asset is None:
+        return xml_string # No assets to replace
+
     meshes = asset.findall("mesh")
     textures = asset.findall("texture")
     all_elements = meshes + textures

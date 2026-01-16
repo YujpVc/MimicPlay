@@ -4,7 +4,7 @@ The main script for evaluating a policy in an environment.
 Args:
     agent (str): path to saved checkpoint pth file
 
-    horizon (int): if provided, override maximum horizon of rollout from the one 
+    horizon (int): if provided, override maximum horizon of rollout from the one
         in the checkpoint
 
     env (str): if provided, override name of env from the one in the checkpoint,
@@ -21,7 +21,7 @@ Args:
     dataset_path (str): if provided, an hdf5 file will be written at this path with the
         rollout data
 
-    dataset_obs (bool): if flag is provided, and @dataset_path is provided, include 
+    dataset_obs (bool): if flag is provided, and @dataset_path is provided, include
         possible high-dimensional observations in output dataset hdf5 file (by default,
         observations are excluded and only simulator states are saved).
 
@@ -45,6 +45,12 @@ Example usage:
           --video_path 'eval_rollouts.mp4'
 
 """
+import sys
+import os
+
+sys.path.append("/home/yujp/robosuite")
+sys.path.append("/home/yujp/robomimic")
+
 import argparse
 import json
 import h5py
@@ -65,7 +71,7 @@ from mimicplay.algo import RolloutPolicy
 
 def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None):
     """
-    Helper function to carry out rollouts. Supports on-screen rendering, off-screen rendering to a video, 
+    Helper function to carry out rollouts. Supports on-screen rendering, off-screen rendering to a video,
     and returns the rollout trajectory.
 
     Args:
@@ -75,9 +81,9 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
         render (bool): whether to render rollout on-screen
         video_writer (imageio writer): if provided, use to write rollout to video
         video_skip (int): how often to write video frames
-        return_obs (bool): if True, return possibly high-dimensional observations along the trajectoryu. 
-            They are excluded by default because the low-dimensional simulation states should be a minimal 
-            representation of the environment. 
+        return_obs (bool): if True, return possibly high-dimensional observations along the trajectoryu.
+            They are excluded by default because the low-dimensional simulation states should be a minimal
+            representation of the environment.
         camera_names (list): determines which camera(s) are used for rendering. Pass more than
             one to output a video with multiple camera views concatenated horizontally.
 
@@ -91,10 +97,12 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
 
     policy.start_episode()
     obs = env.reset()
+    # print(f'obs is {obs}')
     state_dict = env.get_state()
 
     # hack that is necessary for robosuite tasks for deterministic action playback
     obs = env.reset_to(state_dict)
+    # print(f'obs is {obs}')
 
     results = {}
     video_count = 0  # video frame counter
@@ -107,10 +115,16 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
         for step_i in range(horizon):
 
             # get action from policy
+            # print(
+            #     f"===================the shape of agentview_image is: {obs['agentview_image'].shape}===================")
+            # print(
+            #     f"===================the shape of robot0_eye_in_hand_image is: {obs['robot0_eye_in_hand_image'].shape}===================")
             act = policy(ob=obs)
+            print(f"Action at step {step_i}: {act}")
 
             # play action
             next_obs, r, done, _ = env.step(act)
+            # print(f"--------------------------next_obs at step {step_i}: {next_obs}--------------------------")
 
             # compute reward
             total_reward += r
@@ -195,17 +209,19 @@ def run_trained_agent(args):
     if rollout_horizon is None:
         # read horizon from config
         config, _ = FileUtils.config_from_checkpoint(ckpt_dict=ckpt_dict)
-        rollout_horizon = config.experiment.rollout.horizon
+        rollout_horizon = config.experiment.C.horizon
 
     # create environment from saved checkpoint
     env, _ = FileUtils.env_from_checkpoint(
-        ckpt_dict=ckpt_dict, 
-        env_name=args.env, 
-        render=args.render, 
-        render_offscreen=(args.video_path is not None), 
+        ckpt_dict=ckpt_dict,
+        env_name=args.env,
+        render=args.render,
+        render_offscreen=(args.video_path is not None),
         verbose=False,
         bddl_file_name=args.bddl_file
     )
+    print(f'the type of env is {type(env)}')
+    print(f'the name of env is {env.name}')
 
     # maybe set seed
     if args.seed is not None:
@@ -227,12 +243,12 @@ def run_trained_agent(args):
     rollout_stats = []
     for i in range(rollout_num_episodes):
         stats, traj = rollout(
-            policy=policy, 
-            env=env, 
-            horizon=rollout_horizon, 
-            render=args.render, 
-            video_writer=video_writer, 
-            video_skip=args.video_skip, 
+            policy=policy,
+            env=env,
+            horizon=rollout_horizon,
+            render=args.render,
+            video_writer=video_writer,
+            video_skip=args.video_skip,
             return_obs=(write_dataset and args.dataset_obs),
             camera_names=args.camera_names,
         )
@@ -282,7 +298,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agent",
         type=str,
-        required=True,
+        default= '/home/yujp/MimicPlay/trained_models_lowlevel/test/lowlevel_model_epoch_950_modified.pth',
+        required=False,
         help="path to saved checkpoint pth file",
     )
 
@@ -314,6 +331,7 @@ if __name__ == "__main__":
     # Whether to render rollouts to screen
     parser.add_argument(
         "--render",
+        default=False,
         action='store_true',
         help="on-screen rendering",
     )
@@ -370,14 +388,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--bddl_file",
         type=str,
-        default=None,
+        default= '/home/yujp/MimicPlay/mimicplay/scripts/bddl_files/KITCHEN_SCENE9_eval-task-3_put_bowl_on_shelf_put_pan_in_shelf.bddl',
         help="(optional) if provided, the task's goal is specified as the symbolic goal in the bddl file (several symbolic predicates connected with AND / OR)",
     )
 
     parser.add_argument(
         "--video_prompt",
         type=str,
-        default=None,
+        default= '/home/yujp/MimicPlay/mimicplay/datasets/eval-task-3_put_bowl_on_shelf_put_pan_in_shelf/image_demo.hdf5',
         help="(optional) if provided, a task video prompt is loaded and used in the evaluation rollouts",
     )
 

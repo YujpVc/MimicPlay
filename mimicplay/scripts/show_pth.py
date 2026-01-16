@@ -1,8 +1,8 @@
 import torch
 
 # 加载模型
-model_path = '/home/yujp/MimicPlay/trained_models_lowlevel/test/lowlevel_model_epoch_950.pth'
-output_txt_path = '/home/yujp/MimicPlay/trained_models_lowlevel/test/lowlevel_model_epoch_950.txt'
+model_path = '/home/yujp/Genesis/scripts/XBOX_control/dataCollect/demo/demo_study/lowlevel/test/20250611181706/models/model_epoch_1940_best_validation_-43.85680923461914.pth'
+output_txt_path = '/home/yujp/Genesis/scripts/XBOX_control/dataCollect/demo/demo_study/lowlevel/test/20250611181706/models/model_epoch_1940_best_validation_-43.85680923461914.txt'
 content = torch.load(model_path, map_location='cpu')
 
 # 检查 keys

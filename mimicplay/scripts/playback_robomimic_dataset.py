@@ -339,7 +339,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--video_skip",
         type=int,
-        default=5,
+        default=1,
         help="render frames to video every n steps",
     )
 

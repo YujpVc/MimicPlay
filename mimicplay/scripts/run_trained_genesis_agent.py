@@ -46,7 +46,6 @@ Example usage:
 
 """
 import sys
-import os
 
 sys.path.append("/home/yujp/robosuite")
 sys.path.append("/home/yujp/robomimic")
@@ -57,10 +56,11 @@ import h5py
 import imageio
 import numpy as np
 from copy import deepcopy
+from math import tan, radians
 
 import torch
+import cv2
 
-import robomimic
 import mimicplay.utils.file_utils as FileUtils
 import robomimic.utils.torch_utils as TorchUtils
 import robomimic.utils.tensor_utils as TensorUtils
@@ -68,6 +68,98 @@ import robomimic.utils.obs_utils as ObsUtils
 from robomimic.envs.env_base import EnvBase
 from mimicplay.algo import RolloutPolicy
 
+
+# Camera params (must match env_genesis viewer / render_view camera for correct projection)
+CAM_POS = np.array([2.5, 1.0, 1.8], dtype=np.float32)
+CAM_LOOKAT = np.array([0.65, 1.0, 1.0], dtype=np.float32)
+CAM_FOV = 30.0
+
+
+def project_points_to_image(world_points, cam_pos, cam_lookat, cam_fov_degrees, image_width, image_height):
+    """
+    Project 3D world points to 2D image plane (simple pinhole, z-up world).
+    Copied from vis scripts to keep consistent.
+    """
+    world_up = np.array([0.0, 0.0, 1.0], dtype=np.float32)
+    forward = cam_lookat - cam_pos
+    forward = forward / np.linalg.norm(forward)
+    right = np.cross(forward, world_up)
+    right = right / np.linalg.norm(right)
+    up = np.cross(right, forward)
+
+    view_matrix = np.array([
+        [right[0], right[1], right[2], -np.dot(right, cam_pos)],
+        [up[0], up[1], up[2], -np.dot(up, cam_pos)],
+        [-forward[0], -forward[1], -forward[2], np.dot(forward, cam_pos)],
+        [0, 0, 0, 1]
+    ], dtype=np.float32)
+
+    aspect_ratio = float(image_width) / float(image_height)
+    near_plane = 0.1
+    far_plane = 100.0
+    fov_rad = radians(cam_fov_degrees)
+    f = 1.0 / tan(fov_rad / 2.0)
+
+    projection_matrix = np.array([
+        [f / aspect_ratio, 0, 0, 0],
+        [0, f, 0, 0],
+        [0, 0, (far_plane + near_plane) / (near_plane - far_plane),
+         (2 * far_plane * near_plane) / (near_plane - far_plane)],
+        [0, 0, -1, 0]
+    ], dtype=np.float32)
+
+    projected_points = []
+    for point in world_points:
+        p_world = np.append(np.asarray(point, dtype=np.float32), 1.0)
+        p_cam = view_matrix @ p_world
+        if p_cam[2] > -near_plane:
+            continue
+        p_clip = projection_matrix @ p_cam
+        p_ndc = p_clip[:3] / p_clip[3]
+        screen_x = (p_ndc[0] + 1.0) / 2.0 * image_width
+        screen_y = (1.0 - p_ndc[1]) / 2.0 * image_height
+        if 0 <= screen_x < image_width and 0 <= screen_y < image_height:
+            projected_points.append((int(screen_x), int(screen_y)))
+    return projected_points
+
+
+def draw_trajectory_gradient(img_bgr, points, color_bgr, max_radius=6, min_radius=2, max_alpha=0.9, min_alpha=0.2):
+    num_points = len(points)
+    if num_points == 0:
+        return img_bgr
+    for j, point in enumerate(points):
+        overlay = img_bgr.copy()
+        ratio = j / (num_points - 1) if num_points > 1 else 0
+        radius = int(max_radius - ratio * (max_radius - min_radius))
+        alpha = max_alpha - ratio * (max_alpha - min_alpha)
+        cv2.circle(overlay, point, radius, color_bgr, -1)
+        cv2.addWeighted(overlay, alpha, img_bgr, 1 - alpha, 0, img_bgr)
+    return img_bgr
+
+
+def maybe_overlay_planner_on_frame(rgb_img, camera_name, pred_traj_3d, curr_pos_3d):
+    """
+    Overlay predicted planner trajectory (red) and current eef position (green) on a rendered RGB frame.
+    Only supported for fixed cameras with known extrinsics (render_view / agentview_image).
+    """
+    if rgb_img is None:
+        return rgb_img
+    if pred_traj_3d is None or curr_pos_3d is None:
+        return rgb_img
+    if camera_name not in {"render_view", "agentview_image"}:
+        return rgb_img
+
+    h, w = rgb_img.shape[:2]
+    pred_pts_2d = project_points_to_image(pred_traj_3d, CAM_POS, CAM_LOOKAT, CAM_FOV, w, h)
+    curr_pt_2d = project_points_to_image([curr_pos_3d], CAM_POS, CAM_LOOKAT, CAM_FOV, w, h)
+
+    img_bgr = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2BGR)
+    img_bgr = draw_trajectory_gradient(img_bgr, pred_pts_2d, (0, 0, 255))
+    if curr_pt_2d:
+        cv2.circle(img_bgr, curr_pt_2d[0], 6, (0, 255, 0), -1)
+    cv2.putText(img_bgr, "Red: Pred (planner)", (5, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+    cv2.putText(img_bgr, "Green: Curr eef", (5, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+    return cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
 def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None):
     """
@@ -97,43 +189,71 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
 
     policy.start_episode()
     obs = env.reset()
-    # print(f'obs is {obs}')
     state_dict = env.get_state()
 
-    # hack that is necessary for robosuite tasks for deterministic action playback
+    # This reset_to call is necessary for some environments for deterministic playback
     obs = env.reset_to(state_dict)
-    # print(f'obs is {obs}')
 
     results = {}
-    video_count = 0  # video frame counter
+    video_count = 0
     total_reward = 0.
     traj = dict(actions=[], rewards=[], dones=[], states=[], initial_state_dict=state_dict)
     if return_obs:
-        # store observations too
         traj.update(dict(obs=[], next_obs=[]))
+
     try:
+        success = False
         for step_i in range(horizon):
+            # We want the lowlevel action, but also want to visualize highlevel planner outputs.
+            # Lowlevel_GPT_mimicplay.get_action mutates obs_dict by inserting:
+            # - obs_dict["guidance"] : (B, 30) = 10 future 3D points
+            # So we reproduce RolloutPolicy.__call__ here to capture that value.
+            ob_t = policy._prepare_observation(obs)
+            with torch.no_grad():
+                ac_t = policy.policy.get_action(obs_dict=ob_t, goal_dict=None)
+            guidance = ob_t.get("guidance", None)
+            pred_traj_3d = None
+            if guidance is not None:
+                try:
+                    pred_traj_3d = TensorUtils.to_numpy(guidance[0]).reshape(-1, 3)
+                except Exception:
+                    pred_traj_3d = None
+            curr_pos_3d = obs.get("robot0_eef_pos", None)
+            act = TensorUtils.to_numpy(ac_t[0])
+            print(f"Action at step {step_i}:\n{act}")
 
-            # get action from policy
-            act = policy(ob=obs)
-            # print(f"Action at step {step_i}: {act}")
-
-            # play action
             next_obs, r, done, _ = env.step(act)
-            # print(f"--------------------------next_obs at step {step_i}: {next_obs}--------------------------")
 
-            # compute reward
             total_reward += r
             success = env.is_success()["task"]
 
             # visualization
             if render:
-                env.render(mode="human", camera_name=camera_names[0])
+                # Render to RGB array, overlay planner trajectory, then show via OpenCV.
+                # We avoid env.render(mode="human") here because we want to draw on the frame first.
+                cam_name = camera_names[0]
+                frame = env.render(mode="rgb_array", height=512, width=512, camera_name=cam_name)
+                frame = maybe_overlay_planner_on_frame(
+                    rgb_img=frame,
+                    camera_name=cam_name,
+                    pred_traj_3d=pred_traj_3d,
+                    curr_pos_3d=curr_pos_3d,
+                )
+                if frame is not None:
+                    cv2.imshow(f"{cam_name}_overlay", cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+                    cv2.waitKey(1)
             if video_writer is not None:
                 if video_count % video_skip == 0:
                     video_img = []
                     for cam_name in camera_names:
-                        video_img.append(env.render(mode="rgb_array", height=512, width=512, camera_name=cam_name))
+                        frame = env.render(mode="rgb_array", height=512, width=512, camera_name=cam_name)
+                        frame = maybe_overlay_planner_on_frame(
+                            rgb_img=frame,
+                            camera_name=cam_name,
+                            pred_traj_3d=pred_traj_3d,
+                            curr_pos_3d=curr_pos_3d,
+                        )
+                        video_img.append(frame)
                     video_img = np.concatenate(video_img, axis=1) # concatenate horizontally
                     video_writer.append_data(video_img)
                 video_count += 1
@@ -144,13 +264,9 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
             traj["dones"].append(done)
             traj["states"].append(state_dict["states"])
             if return_obs:
-                # Note: We need to "unprocess" the observations to prepare to write them to dataset.
-                #       This includes operations like channel swapping and float to uint8 conversion
-                #       for saving disk space.
                 traj["obs"].append(ObsUtils.unprocess_obs_dict(obs))
                 traj["next_obs"].append(ObsUtils.unprocess_obs_dict(next_obs))
 
-            # break if done or if success
             if done or success:
                 break
 
@@ -159,16 +275,17 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
             state_dict = env.get_state()
 
     except env.rollout_exceptions as e:
-        print("WARNING: got rollout exception {}".format(e))
+        print(f"WARNING: Caught a rollout exception: {e}")
+    except Exception as e:
+        print(f"An unexpected exception occurred during rollout: {e}")
+        raise
 
     stats = dict(Return=total_reward, Horizon=(step_i + 1), Success_Rate=float(success))
 
     if return_obs:
-        # convert list of dict to dict of list for obs dictionaries (for convenient writes to hdf5 dataset)
         traj["obs"] = TensorUtils.list_of_flat_dict_to_dict_of_list(traj["obs"])
         traj["next_obs"] = TensorUtils.list_of_flat_dict_to_dict_of_list(traj["next_obs"])
 
-    # list to numpy array
     for k in traj:
         if k == "initial_state_dict":
             continue
@@ -184,15 +301,11 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
 def run_trained_agent(args):
     # some arg checking
     write_video = (args.video_path is not None)
-    assert not (args.render and write_video) # either on-screen or video but not both
+    assert not (args.render and write_video)
     if args.render:
-        # on-screen rendering can only support one camera
         assert len(args.camera_names) == 1
 
-    # relative path to agent
     ckpt_path = args.agent
-
-    # device
     device = TorchUtils.get_torch_device(try_to_use_cuda=True)
 
     # restore policy
@@ -203,7 +316,6 @@ def run_trained_agent(args):
     rollout_num_episodes = args.n_rollouts
     rollout_horizon = args.horizon
     if rollout_horizon is None:
-        # read horizon from config
         config, _ = FileUtils.config_from_checkpoint(ckpt_dict=ckpt_dict)
         rollout_horizon = config.experiment.C.horizon
 
@@ -214,22 +326,24 @@ def run_trained_agent(args):
         render=args.render,
         render_offscreen=(args.video_path is not None),
         verbose=False,
-        bddl_file_name=args.bddl_file
     )
-    print(f'the type of env is {type(env)}')
-    print(f'the name of env is {env.name}')
 
-    # maybe set seed
+    if args.condition_file is not None:
+        env.condition_file = args.condition_file
+        env._load_condition_file()
+        print(f"Success condition loaded from: {env.condition_file}")
+
+    print(f"Environment Type: {type(env)}")
+    print(f"Environment Name: {env.name}")
+
     if args.seed is not None:
         np.random.seed(args.seed)
         torch.manual_seed(args.seed)
 
-    # maybe create video writer
     video_writer = None
     if write_video:
         video_writer = imageio.get_writer(args.video_path, fps=20)
 
-    # maybe open hdf5 to write rollouts
     write_dataset = (args.dataset_path is not None)
     if write_dataset:
         data_writer = h5py.File(args.dataset_path, "w")
@@ -238,6 +352,7 @@ def run_trained_agent(args):
 
     rollout_stats = []
     for i in range(rollout_num_episodes):
+        print(f"\n--- Running rollout {i+1} of {rollout_num_episodes} ---")
         stats, traj = rollout(
             policy=policy,
             env=env,
@@ -251,150 +366,125 @@ def run_trained_agent(args):
         rollout_stats.append(stats)
 
         if write_dataset:
-            # store transitions
-            ep_data_grp = data_grp.create_group("demo_{}".format(i))
+            ep_data_grp = data_grp.create_group(f"demo_{i}")
             ep_data_grp.create_dataset("actions", data=np.array(traj["actions"]))
             ep_data_grp.create_dataset("states", data=np.array(traj["states"]))
             ep_data_grp.create_dataset("rewards", data=np.array(traj["rewards"]))
             ep_data_grp.create_dataset("dones", data=np.array(traj["dones"]))
             if args.dataset_obs:
                 for k in traj["obs"]:
-                    ep_data_grp.create_dataset("obs/{}".format(k), data=np.array(traj["obs"][k]))
-                    ep_data_grp.create_dataset("next_obs/{}".format(k), data=np.array(traj["next_obs"][k]))
+                    ep_data_grp.create_dataset(f"obs/{k}", data=np.array(traj["obs"][k]))
+                    ep_data_grp.create_dataset(f"next_obs/{k}", data=np.array(traj["next_obs"][k]))
 
-            # episode metadata
             if "model" in traj["initial_state_dict"]:
-                ep_data_grp.attrs["model_file"] = traj["initial_state_dict"]["model"] # model xml for this episode
-            ep_data_grp.attrs["num_samples"] = traj["actions"].shape[0] # number of transitions in this episode
+                ep_data_grp.attrs["model_file"] = traj["initial_state_dict"]["model"]
+            ep_data_grp.attrs["num_samples"] = traj["actions"].shape[0]
             total_samples += traj["actions"].shape[0]
 
     rollout_stats = TensorUtils.list_of_flat_dict_to_dict_of_list(rollout_stats)
     avg_rollout_stats = { k : np.mean(rollout_stats[k]) for k in rollout_stats }
     avg_rollout_stats["Num_Success"] = np.sum(rollout_stats["Success_Rate"])
-    with open('{}_results.json'.format(args.video_path.split('.')[0]), 'w') as json_file:
-        json.dump(avg_rollout_stats, json_file, indent=4)
-    print("Average Rollout Stats")
+
+    if args.video_path is not None:
+        results_filename = f"{args.video_path.rsplit('.', 1)[0]}_results.json"
+        with open(results_filename, 'w') as json_file:
+            json.dump(avg_rollout_stats, json_file, indent=4)
+
+    print("\n--- Average Rollout Stats ---")
     print(json.dumps(avg_rollout_stats, indent=4))
 
     if write_video:
         video_writer.close()
 
     if write_dataset:
-        # global metadata
         data_grp.attrs["total"] = total_samples
-        data_grp.attrs["env_args"] = json.dumps(env.serialize(), indent=4) # environment info
+        data_grp.attrs["env_args"] = json.dumps(env.serialize(), indent=4)
         data_writer.close()
-        print("Wrote dataset trajectories to {}".format(args.dataset_path))
+        print(f"Wrote dataset trajectories to {args.dataset_path}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    # Path to trained model
     parser.add_argument(
         "--agent",
         type=str,
-        default= '/home/yujp/MimicPlay/trained_models_lowlevel/test/lowlevel_model_epoch_950_modified.pth',
-        required=False,
+        default='/home/yujp/MimicPlay/trained_models_lowlevel/test/lowlevel_model_epoch_950_modified.pth',
         help="path to saved checkpoint pth file",
     )
-
-    # number of rollouts
     parser.add_argument(
         "--n_rollouts",
         type=int,
         default=100,
         help="number of rollouts",
     )
-
-    # maximum horizon of rollout, to override the one stored in the model checkpoint
     parser.add_argument(
         "--horizon",
         type=int,
         default=2000,
         help="(optional) override maximum horizon of rollout from the one in the checkpoint",
     )
-
-    # Env Name (to override the one stored in model checkpoint)
     parser.add_argument(
         "--env",
         type=str,
         default=None,
-        help="(optional) override name of env from the one in the checkpoint, and use\
-            it for rollouts",
+        help="(optional) override name of env from the one in the checkpoint, and use it for rollouts",
     )
-
-    # Whether to render rollouts to screen
     parser.add_argument(
         "--render",
-        default= True,
+        default=False,
         action='store_true',
         help="on-screen rendering",
     )
 
-    # Dump a video of the rollouts to the specified path
     parser.add_argument(
         "--video_path",
         type=str,
         default=None,
         help="(optional) render rollouts to this video file path",
     )
-
-    # How often to write video frames during the rollout
     parser.add_argument(
         "--video_skip",
         type=int,
         default=5,
         help="render frames to video every n steps",
     )
-
-    # camera names to render
     parser.add_argument(
         "--camera_names",
         type=str,
         nargs='+',
-        default=["agentview"],
+        default=["render_view"],
         help="(optional) camera name(s) to use for rendering on-screen or to video",
     )
-
-    # If provided, an hdf5 file will be written with the rollout data
     parser.add_argument(
         "--dataset_path",
         type=str,
         default=None,
         help="(optional) if provided, an hdf5 file will be written at this path with the rollout data",
     )
-
-    # If True and @dataset_path is supplied, will write possibly high-dimensional observations to dataset.
     parser.add_argument(
         "--dataset_obs",
         action='store_true',
-        help="include possibly high-dimensional observations in output dataset hdf5 file (by default,\
-            observations are excluded and only simulator states are saved)",
+        help="include possibly high-dimensional observations in output dataset hdf5 file",
     )
-
-    # for seeding before starting rollouts
     parser.add_argument(
         "--seed",
         type=int,
         default=None,
         help="(optional) set seed for rollouts",
     )
-
-    parser.add_argument(
-        "--bddl_file",
-        type=str,
-        default= '/home/yujp/MimicPlay/mimicplay/scripts/bddl_files/KITCHEN_SCENE9_eval-task-3_put_bowl_on_shelf_put_pan_in_shelf.bddl',
-        help="(optional) if provided, the task's goal is specified as the symbolic goal in the bddl file (several symbolic predicates connected with AND / OR)",
-    )
-
     parser.add_argument(
         "--video_prompt",
         type=str,
-        default= '/home/yujp/MimicPlay/mimicplay/datasets/eval-task-3_put_bowl_on_shelf_put_pan_in_shelf/image_demo.hdf5',
+        default='/home/yujp/MimicPlay/mimicplay/datasets/eval-task-3_put_bowl_on_shelf_put_pan_in_shelf/image_demo.hdf5',
         help="(optional) if provided, a task video prompt is loaded and used in the evaluation rollouts",
+    )
+    parser.add_argument(
+        "--condition_file",
+        type=str,
+        default=None,
+        help="(optional) path to the file defining the task's symbolic goal",
     )
 
     args = parser.parse_args()
     run_trained_agent(args)
-

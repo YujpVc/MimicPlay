@@ -2,10 +2,10 @@ import h5py
 import numpy as np
 import cv2
 
-view_id = 1 # change to 2 if drawing on second view
+view_id = 2 # change to 2 if drawing on second view
 
 
-with h5py.File('demo_hand_loc_1_new.hdf5', 'r') as f:
+with h5py.File('/home/yujp/MimicPlay/mimicplay/scripts/human_playdata_process/hand_object_detector/demo_hand_loc_1_new.hdf5', 'r') as f:
     images = np.array(f['data/demo_0/obs/front_image_{}'.format(view_id)])
     actions = np.array(f['data/demo_0/actions'])
 

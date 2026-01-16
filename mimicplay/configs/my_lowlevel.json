@@ -1,7 +1,7 @@
 {
     "algo_name": "mimicplay",
     "experiment": {
-        "name": "test",
+        "name": "my_test",
         "validate": true,
         "logging": {
             "terminal_output_to_txt": true,
@@ -155,7 +155,7 @@
             "spatial_softmax_num_kp": 64,
             "gmm_min_std": 0.0001,
             "dropout": 0.1,
-            "trained_highlevel_planner": "/home/yujp/MimicPlay/trained_models_highlevel/test/20241125011602/models/model_epoch_360_best_validation_-65.43912620544434.pth",
+            "trained_highlevel_planner": "/home/yujp/MimicPlay/trained_models_highlevel/test/20241223154004/models/model_epoch_1_best_validation_-3.5088472843170164.pth",
             "eval_goal_img_window": 30,
             "eval_max_goal_img_iter": 5
         },

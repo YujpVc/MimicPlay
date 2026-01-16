@@ -231,8 +231,8 @@ class GMMActorNetwork(ActorNetwork):
         logits = out["logits"]
 
         # apply tanh squashing to means if not using tanh-GMM to ensure means are in [-1, 1]
-        if not self.use_tanh:
-            means = torch.tanh(means)
+        # if not self.use_tanh:
+        #     means = torch.tanh(means)
 
         # Calculate scale
         if self.low_noise_eval and (not self.training):
@@ -416,8 +416,8 @@ class RNNGMMActorNetwork(RNNActorNetwork):
         logits = outputs["logits"]
 
         # apply tanh squashing to mean if not using tanh-GMM to ensure means are in [-1, 1]
-        if not self.use_tanh:
-            means = torch.tanh(means)
+        # if not self.use_tanh:
+        #     means = torch.tanh(means)
 
         if self.low_noise_eval and (not self.training):
             # low-noise for all Gaussian dists

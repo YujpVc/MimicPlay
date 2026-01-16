@@ -44,11 +44,15 @@ Example usage:
         --done_mode 1 --dense --camera_names agentview robot0_eye_in_hand --camera_height 84 --camera_width 84
 """
 import os
+import sys
 import json
 import h5py
 import argparse
 import numpy as np
 from copy import deepcopy
+
+sys.path.append("/home/yujp/robosuite")
+sys.path.append("/home/yujp/robomimic")
 
 import robomimic.utils.tensor_utils as TensorUtils
 import robomimic.utils.file_utils as FileUtils
@@ -76,12 +80,14 @@ def extract_trajectory(
             success state. If 1, done is 1 at the end of each trajectory. 
             If 2, do both.
     """
+    print(f"开始轨迹提取，共{states.shape[0]}个状态")
     assert isinstance(env, EnvBase)
     assert states.shape[0] == actions.shape[0]
 
     # load the initial state
     env.reset()
     obs = env.reset_to(initial_state)
+    print("初始重置成功")
 
     traj = dict(
         obs=[], 
@@ -95,38 +101,44 @@ def extract_trajectory(
     traj_len = states.shape[0]
     # iteration variable @t is over "next obs" indices
     for t in range(1, traj_len + 1):
+        print(f"处理时间步 {t}/{traj_len}")
+        try:
+            # get next observation
+            if t == traj_len:
+                # play final action to get next observation for last timestep
+                next_obs, _, _, _ = env.step(actions[t - 1])
+                print(f"执行第{t}步")
+            else:
+                # reset to simulator state to get observation
+                next_obs = env.reset_to({"states" : states[t]})
+                print(f"重置到状态{t}")
 
-        # get next observation
-        if t == traj_len:
-            # play final action to get next observation for last timestep
-            next_obs, _, _, _ = env.step(actions[t - 1])
-        else:
-            # reset to simulator state to get observation
-            next_obs = env.reset_to({"states" : states[t]})
+            # infer reward signal
+            # note: our tasks use reward r(s'), reward AFTER transition, so this is
+            #       the reward for the current timestep
+            r = env.get_reward()
 
-        # infer reward signal
-        # note: our tasks use reward r(s'), reward AFTER transition, so this is
-        #       the reward for the current timestep
-        r = env.get_reward()
+            # infer done signal
+            done = False
+            if (done_mode == 1) or (done_mode == 2):
+                # done = 1 at end of trajectory
+                done = done or (t == traj_len)
+            if (done_mode == 0) or (done_mode == 2):
+                # done = 1 when s' is task success state
+                done = done or env.is_success()["task"]
+            done = int(done)
 
-        # infer done signal
-        done = False
-        if (done_mode == 1) or (done_mode == 2):
-            # done = 1 at end of trajectory
-            done = done or (t == traj_len)
-        if (done_mode == 0) or (done_mode == 2):
-            # done = 1 when s' is task success state
-            done = done or env.is_success()["task"]
-        done = int(done)
+            # collect transition
+            traj["obs"].append(obs)
+            traj["next_obs"].append(next_obs)
+            traj["rewards"].append(r)
+            traj["dones"].append(done)
 
-        # collect transition
-        traj["obs"].append(obs)
-        traj["next_obs"].append(next_obs)
-        traj["rewards"].append(r)
-        traj["dones"].append(done)
-
-        # update for next iter
-        obs = deepcopy(next_obs)
+            # update for next iter
+            obs = deepcopy(next_obs)
+        except Exception as e:
+            print(f"时间步{t}出错：{str(e)}")
+            raise
 
     # convert list of dict to dict of list for obs dictionaries (for convenient writes to hdf5 dataset)
     traj["obs"] = TensorUtils.list_of_flat_dict_to_dict_of_list(traj["obs"])
@@ -142,6 +154,7 @@ def extract_trajectory(
         else:
             traj[k] = np.array(traj[k])
 
+    print("轨迹提取完成")
     return traj
 
 

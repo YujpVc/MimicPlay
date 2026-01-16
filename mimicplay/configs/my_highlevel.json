@@ -1,7 +1,7 @@
 {
     "algo_name": "mimicplay",
     "experiment": {
-        "name": "test",
+        "name": "my_test",
         "validate": true,
         "logging": {
             "terminal_output_to_txt": true,
@@ -140,7 +140,7 @@
         },
         "highlevel": {
             "enabled": true,
-            "ac_dim": 30,
+            "ac_dim": 40,
             "latent_plan_dim": 400
         },
         "lowlevel": {

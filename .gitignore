@@ -1,7 +1,43 @@
 **/__pycache__
+*.py[cod]
+*$py.class
 *.egg-info
+.egg-info/
+*.egg
 
+# Datasets and Demos
 datasets/
-trained_models_highlevel
+data_collect/demos/
+*.hdf5
 
+# Trained Models and Checkpoints
+trained_models_highlevel/
+trained_models_lowlevel/
+trained_models_baseline_bc_rnn_from_scratch/
+*.pth
+*.ckpt
+
+# Analysis and Results
+dataset_analysis_results/
+mimicplay/dataset_analysis_results/
+training_result/
+
+# Video and Image Artifacts
 *.mp4
+*.gif
+*.png
+# Keep assets if they are part of README/Documentation
+!assets/*.gif
+!assets/*.png
+!MimicPlay/assets/*.gif
+!MimicPlay/assets/*.png
+
+# IDE and System
+.idea/
+.vscode/
+.cursor/
+.DS_Store
+*.swp
+
+# Temporary/Debug Files
+debug_summary.md

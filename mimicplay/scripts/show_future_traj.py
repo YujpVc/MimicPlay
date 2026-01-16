@@ -1,364 +1,205 @@
-"""
-A script to visualize dataset trajectories by loading the simulation states
-one by one or loading the first state and playing actions back open-loop.
-The script can generate videos as well, by rendering simulation frames
-during playback. The videos can also be generated using the image observations
-in the dataset (this is useful for real-robot datasets) by using the
---use-obs argument.
-
-Args:
-    dataset (str): path to hdf5 dataset
-
-    filter_key (str): if provided, use the subset of trajectories
-        in the file that correspond to this filter key
-
-    n (int): if provided, stop after n trajectories are processed
-
-    use-obs (bool): if flag is provided, visualize trajectories with dataset 
-        image observations instead of simulator
-
-    use-actions (bool): if flag is provided, use open-loop action playback 
-        instead of loading sim states
-
-    render (bool): if flag is provided, use on-screen rendering during playback
-    
-    video_path (str): if provided, render trajectories to this video file path
-
-    video_skip (int): render frames to a video every @video_skip steps
-
-    render_image_names (str or [str]): camera name(s) / image observation(s) to 
-        use for rendering on-screen or to video
-
-    first (bool): if flag is provided, use first frame of each episode for playback
-        instead of the entire episode. Useful for visualizing task initializations.
-
-Example usage below:
-
-    # force simulation states one by one, and render agentview and wrist view cameras to video
-    python playback_robomimic_dataset.py --dataset /path/to/dataset.hdf5 \
-        --render_image_names agentview robot0_eye_in_hand \
-        --video_path /tmp/playback_dataset.mp4
-
-    # playback the actions in the dataset, and render agentview camera during playback to video
-    python playback_robomimic_dataset.py --dataset /path/to/dataset.hdf5 \
-        --use-actions --render_image_names agentview \
-        --video_path /tmp/playback_dataset_with_actions.mp4
-
-    # use the observations stored in the dataset to render videos of the dataset trajectories
-    python playback_robomimic_dataset.py --dataset /path/to/dataset.hdf5 \
-        --use-obs --render_image_names agentview_image \
-        --video_path /tmp/obs_trajectory.mp4
-
-    # visualize initial states in the demonstration data
-    python playback_robomimic_dataset.py --dataset /path/to/dataset.hdf5 \
-        --first --render_image_names agentview \
-        --video_path /tmp/dataset_task_inits.mp4
-"""
-
-import os
-import json
 import h5py
-import argparse
-import imageio
 import numpy as np
-
-import robomimic
-import robomimic.utils.obs_utils as ObsUtils
-import robomimic.utils.env_utils as EnvUtils
-import robomimic.utils.file_utils as FileUtils
-from robomimic.envs.env_base import EnvBase, EnvType
-
-
-# Define default cameras to use for each env type
-DEFAULT_CAMERAS = {
-    EnvType.ROBOSUITE_TYPE: ["agentview"],
-    EnvType.IG_MOMART_TYPE: ["rgb"],
-    EnvType.GYM_TYPE: ValueError("No camera names supported for gym type env!"),
-}
+import cv2
+import imageio
+import argparse
+import os
+from math import tan, radians
 
 
-def playback_trajectory_with_env(
-    env, 
-    initial_state, 
-    states, 
-    actions=None, 
-    render=False, 
-    video_writer=None, 
-    video_skip=5, 
-    camera_names=None,
-    first=False,
-):
+def project_points_to_image(world_points, cam_pos, cam_lookat, cam_fov_degrees, image_width, image_height):
     """
-    Helper function to playback a single trajectory using the simulator environment.
-    If @actions are not None, it will play them open-loop after loading the initial state. 
-    Otherwise, @states are loaded one by one.
-
-    Args:
-        env (instance of EnvBase): environment
-        initial_state (dict): initial simulation state to load
-        states (np.array): array of simulation states to load
-        actions (np.array): if provided, play actions back open-loop instead of using @states
-        render (bool): if True, render on-screen
-        video_writer (imageio writer): video writer
-        video_skip (int): determines rate at which environment frames are written to video
-        camera_names (list): determines which camera(s) are used for rendering. Pass more than
-            one to output a video with multiple camera views concatenated horizontally.
-        first (bool): if True, only use the first frame of each episode.
+    将3D世界坐标点投影到2D图像平面上。
+    （此函数无需修改）
     """
-    assert isinstance(env, EnvBase)
 
-    write_video = (video_writer is not None)
-    video_count = 0
-    assert not (render and write_video)
+    # 1. 构建视图矩阵 (View Matrix)
+    world_up = np.array([0.0, 0.0, 1.0])
+    forward = cam_lookat - cam_pos
+    forward = forward / np.linalg.norm(forward)
+    right = np.cross(forward, world_up)
+    right = right / np.linalg.norm(right)
+    up = np.cross(right, forward)
 
-    # load the initial state
-    env.reset()
-    env.reset_to(initial_state)
+    view_matrix = np.array([
+        [right[0], right[1], right[2], -np.dot(right, cam_pos)],
+        [up[0], up[1], up[2], -np.dot(up, cam_pos)],
+        [-forward[0], -forward[1], -forward[2], np.dot(forward, cam_pos)],
+        [0, 0, 0, 1]
+    ])
 
-    traj_len = states.shape[0]
-    action_playback = (actions is not None)
-    if action_playback:
-        assert states.shape[0] == actions.shape[0]
+    # 2. 构建透视投影矩阵 (Perspective Projection Matrix)
+    aspect_ratio = image_width / image_height
+    near_plane = 0.1
+    far_plane = 100.0
+    fov_rad = radians(cam_fov_degrees)
+    f = 1.0 / tan(fov_rad / 2.0)
 
-    for i in range(traj_len):
-        if action_playback:
-            env.step(actions[i])
-            if i < traj_len - 1:
-                # check whether the actions deterministically lead to the same recorded states
-                state_playback = env.get_state()["states"]
-                if not np.all(np.equal(states[i + 1], state_playback)):
-                    err = np.linalg.norm(states[i + 1] - state_playback)
-                    print("warning: playback diverged by {} at step {}".format(err, i))
-        else:
-            env.reset_to({"states" : states[i]})
+    projection_matrix = np.array([
+        [f / aspect_ratio, 0, 0, 0],
+        [0, f, 0, 0],
+        [0, 0, (far_plane + near_plane) / (near_plane - far_plane),
+         (2 * far_plane * near_plane) / (near_plane - far_plane)],
+        [0, 0, -1, 0]
+    ])
 
-        # on-screen render
-        if render:
-            env.render(mode="human", camera_name=camera_names[0])
+    # 3. 应用变换
+    projected_points = []
+    for point in world_points:
+        p_world = np.append(point, 1.0)
+        p_cam = view_matrix @ p_world
+        if p_cam[2] > -near_plane:
+            continue
+        p_clip = projection_matrix @ p_cam
+        p_ndc = p_clip[:3] / p_clip[3]
+        screen_x = (p_ndc[0] + 1.0) / 2.0 * image_width
+        screen_y = (1.0 - p_ndc[1]) / 2.0 * image_height
+        if 0 <= screen_x < image_width and 0 <= screen_y < image_height:
+            projected_points.append((int(screen_x), int(screen_y)))
 
-        # video render
-        if write_video:
-            if video_count % video_skip == 0:
-                video_img = []
-                for cam_name in camera_names:
-                    video_img.append(env.render(mode="rgb_array", height=512, width=512, camera_name=cam_name))
-                video_img = np.concatenate(video_img, axis=1) # concatenate horizontally
-                video_writer.append_data(video_img)
-            video_count += 1
-
-        if first:
-            break
+    return projected_points
 
 
-def playback_trajectory_with_obs(
-    traj_grp,
-    video_writer, 
-    video_skip=5, 
-    image_names=None,
-    first=False,
-):
+def generate_trajectory_video(args):
     """
-    This function reads all "rgb" observations in the dataset trajectory and
-    writes them into a video.
-
-    Args:
-        traj_grp (hdf5 file group): hdf5 group which corresponds to the dataset trajectory to playback
-        video_writer (imageio writer): video writer
-        video_skip (int): determines rate at which environment frames are written to video
-        image_names (list): determines which image observations are used for rendering. Pass more than
-            one to output a video with multiple image observations concatenated horizontally.
-        first (bool): if True, only use the first frame of each episode.
+    主函数，用于生成带有未来轨迹可视化的视频。
     """
-    assert image_names is not None, "error: must specify at least one image observation to use in @image_names"
-    video_count = 0
+    # --- 参数定义 ---
+    CAM_POS = np.array([2.5, 1.0, 1.8])
+    CAM_LOOKAT = np.array([0.65, 1.0, 1.0])
+    CAM_FOV = 30.0
 
-    traj_len = traj_grp["actions"].shape[0]
-    for i in range(traj_len):
-        if video_count % video_skip == 0:
-            # concatenate image obs together
-            im = [traj_grp["obs/{}".format(k)][i] for k in image_names]
-            frame = np.concatenate(im, axis=1)
-            video_writer.append_data(frame)
-        video_count += 1
+    # 未来轨迹点可视化参数
+    FUTURE_MAX_RADIUS = 9
+    FUTURE_MIN_RADIUS = 0.5
+    FUTURE_MAX_ALPHA = 0.9
+    FUTURE_MIN_ALPHA = 0.2
+    FUTURE_POINT_COLOR_BGR = (0, 0, 255)  # BGR: 红色
 
-        if first:
-            break
+    # 当前位置点可视化参数
+    CURRENT_POINT_RADIUS = 10
+    CURRENT_POINT_COLOR_BGR = (0, 255, 0)  # BGR: 绿色
 
+    if not os.path.exists(args.dataset):
+        print(f"错误：数据集文件不存在: {args.dataset}")
+        return
 
-def playback_dataset(args):
-    # some arg checking
-    write_video = (args.video_path is not None)
-    assert not (args.render and write_video) # either on-screen or video but not both
-
-    # Auto-fill camera rendering info if not specified
-    if args.render_image_names is None:
-        # We fill in the automatic values
-        env_meta = FileUtils.get_env_metadata_from_dataset(dataset_path=args.dataset)
-        env_type = EnvUtils.get_env_type(env_meta=env_meta)
-        args.render_image_names = DEFAULT_CAMERAS[env_type]
-
-    if args.render:
-        # on-screen rendering can only support one camera
-        assert len(args.render_image_names) == 1
-
-    if args.use_obs:
-        assert write_video, "playback with observations can only write to video"
-        assert not args.use_actions, "playback with observations is offline and does not support action playback"
-
-    # create environment only if not playing back with observations
-    if not args.use_obs:
-        # need to make sure ObsUtils knows which observations are images, but it doesn't matter 
-        # for playback since observations are unused. Pass a dummy spec here.
-        dummy_spec = dict(
-            obs=dict(
-                    low_dim=["robot0_eef_pos"],
-                    rgb=[],
-                ),
-        )
-        ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_specs=dummy_spec)
-
-        env_meta = FileUtils.get_env_metadata_from_dataset(dataset_path=args.dataset)
-        env = EnvUtils.create_env_from_metadata(env_meta=env_meta, render=args.render, render_offscreen=write_video)
-
-        # some operations for playback are robosuite-specific, so determine if this environment is a robosuite env
-        is_robosuite_env = EnvUtils.is_robosuite_env(env_meta)
-
-    f = h5py.File(args.dataset, "r")
-
-    # list of all demonstration episodes (sorted in increasing number order)
-    if args.filter_key is not None:
-        print("using filter key: {}".format(args.filter_key))
-        demos = [elem.decode("utf-8") for elem in np.array(f["mask/{}".format(args.filter_key)])]
-    else:
+    with h5py.File(args.dataset, "r") as f:
         demos = list(f["data"].keys())
-    inds = np.argsort([int(elem[5:]) for elem in demos])
-    demos = [demos[i] for i in inds]
+        inds = np.argsort([int(elem[5:]) for elem in demos])
+        demos = [demos[i] for i in inds]
+        print(f"找到 {len(demos)} 个 'demo'.")
 
-    # maybe reduce the number of demonstrations to playback
-    if args.n is not None:
-        demos = demos[:args.n]
-
-    # maybe dump video
-    video_writer = None
-    if write_video:
         video_writer = imageio.get_writer(args.video_path, fps=20)
 
-    for ind in range(len(demos)):
-        ep = demos[ind]
-        print("Playing back episode: {}".format(ep))
+        for i, ep in enumerate(demos):
+            print(f"正在处理 Demo {i + 1}/{len(demos)}: {ep}")
 
-        if args.use_obs:
-            playback_trajectory_with_obs(
-                traj_grp=f["data/{}".format(ep)], 
-                video_writer=video_writer, 
-                video_skip=args.video_skip,
-                image_names=args.render_image_names,
-                first=args.first,
-            )
-            continue
+            traj_grp = f[f"data/{ep}"]
+            required_keys = ["obs/agentview_image", "obs/robot0_eef_pos_future_traj", "obs/robot0_eef_pos"]
+            if not all(key in traj_grp for key in required_keys):
+                print(f"警告: Demo {ep} 缺少所需数据, 已跳过。")
+                continue
 
-        # prepare initial state to reload from
-        states = f["data/{}/states".format(ep)][()]
-        initial_state = dict(states=states[0])
-        if is_robosuite_env:
-            initial_state["model"] = f["data/{}".format(ep)].attrs["model_file"]
+            images = traj_grp["obs/agentview_image"]
+            future_trajs = traj_grp["obs/robot0_eef_pos_future_traj"]
+            current_eef_positions = traj_grp["obs/robot0_eef_pos"]
 
-        # supply actions if using open-loop action playback
-        actions = None
-        if args.use_actions:
-            actions = f["data/{}/actions".format(ep)][()]
+            num_frames = images.shape[0]
+            image_height, image_width, _ = images[0].shape
 
-        playback_trajectory_with_env(
-            env=env, 
-            initial_state=initial_state, 
-            states=states, actions=actions, 
-            render=args.render, 
-            video_writer=video_writer, 
-            video_skip=args.video_skip,
-            camera_names=args.render_image_names,
-            first=args.first,
-        )
+            for frame_idx in range(num_frames):
+                output_image = cv2.cvtColor(images[frame_idx], cv2.COLOR_RGB2BGR)
 
-    f.close()
-    if write_video:
+                # --- 1. 绘制半透明的未来轨迹点 ---
+                future_points_3d = future_trajs[frame_idx].reshape(10, 3)
+                future_points_2d = project_points_to_image(
+                    world_points=future_points_3d,
+                    cam_pos=CAM_POS, cam_lookat=CAM_LOOKAT, cam_fov_degrees=CAM_FOV,
+                    image_width=image_width, image_height=image_height
+                )
+
+                num_points = len(future_points_2d)
+                if num_points > 0:
+                    for j, point in enumerate(future_points_2d):
+                        overlay = output_image.copy()
+
+                        # 计算渐变属性
+                        ratio = j / (num_points - 1) if num_points > 1 else 0
+                        radius = int(FUTURE_MAX_RADIUS - ratio * (FUTURE_MAX_RADIUS - FUTURE_MIN_RADIUS))
+                        alpha = FUTURE_MAX_ALPHA - ratio * (FUTURE_MAX_ALPHA - FUTURE_MIN_ALPHA)
+
+                        # 【新】计算并应用振动效果
+                        if args.enable_vibration:
+                            # 根据点的远近计算当前振动强度
+                            current_strength = args.vibration_strength * ratio
+                            # 生成随机偏移量
+                            dx = np.random.uniform(-current_strength, current_strength)
+                            dy = np.random.uniform(-current_strength, current_strength)
+                            # 应用偏移
+                            final_point = (int(point[0] + dx), int(point[1] + dy))
+                        else:
+                            final_point = point
+
+                        cv2.circle(overlay, final_point, radius, FUTURE_POINT_COLOR_BGR, -1)
+                        cv2.addWeighted(overlay, alpha, output_image, 1 - alpha, 0, output_image)
+
+                # --- 2. 绘制完全不透明的当前位置点 ---
+                current_pos_3d = current_eef_positions[frame_idx]
+                current_point_2d_list = project_points_to_image(
+                    world_points=[current_pos_3d],
+                    cam_pos=CAM_POS, cam_lookat=CAM_LOOKAT, cam_fov_degrees=CAM_FOV,
+                    image_width=image_width, image_height=image_height
+                )
+
+                if current_point_2d_list:
+                    cv2.circle(output_image, current_point_2d_list[0], CURRENT_POINT_RADIUS, CURRENT_POINT_COLOR_BGR,
+                               -1)
+
+                # --- 3. 将最终帧写入视频 ---
+                final_frame_rgb = cv2.cvtColor(output_image, cv2.COLOR_BGR2RGB)
+                video_writer.append_data(final_frame_rgb)
+
         video_writer.close()
+        print(f"视频已成功保存到: {args.video_path}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="从HDF5数据集生成一个视频，其中可视化了机器人末端的当前位置和未来轨迹。"
+    )
     parser.add_argument(
         "--dataset",
         type=str,
-        help="path to hdf5 dataset",
+        required=True,
+        help="HDF5数据集文件的路径。",
     )
-    parser.add_argument(
-        "--filter_key",
-        type=str,
-        default=None,
-        help="(optional) filter key, to select a subset of trajectories in the file",
-    )
-
-    # number of trajectories to playback. If omitted, playback all of them.
-    parser.add_argument(
-        "--n",
-        type=int,
-        default=None,
-        help="(optional) stop after n trajectories are played",
-    )
-
-    # Use image observations instead of doing playback using the simulator env.
-    parser.add_argument(
-        "--use-obs",
-        action='store_true',
-        help="visualize trajectories with dataset image observations instead of simulator",
-    )
-
-    # Playback stored dataset actions open-loop instead of loading from simulation states.
-    parser.add_argument(
-        "--use-actions",
-        action='store_true',
-        help="use open-loop action playback instead of loading sim states",
-    )
-
-    # Whether to render playback to screen
-    parser.add_argument(
-        "--render",
-        action='store_true',
-        help="on-screen rendering",
-    )
-
-    # Dump a video of the dataset playback to the specified path
     parser.add_argument(
         "--video_path",
         type=str,
         default=None,
-        help="(optional) render trajectories to this video file path",
+        help="（可选）输出视频文件的路径。如果未提供，将在数据集同目录下生成。",
     )
-
-    # How often to write video frames during the playback
+    # 【新】添加的命令行参数
     parser.add_argument(
-        "--video_skip",
-        type=int,
-        default=1,
-        help="render frames to video every n steps",
+        "--enable_vibration",
+        action='store_true',  # 这使其成为一个开关，存在即为True
+        help="（可选）为未来轨迹点启用随机振动效果，模拟不确定性。"
     )
-
-    # camera names to render, or image observations to use for writing to video
     parser.add_argument(
-        "--render_image_names",
-        type=str,
-        nargs='+',
-        default=None,
-        help="(optional) camera name(s) / image observation(s) to use for rendering on-screen or to video. Default is"
-             "None, which corresponds to a predefined camera for each env type",
-    )
-
-    # Only use the first frame of each episode
-    parser.add_argument(
-        "--first",
-        action='store_true',
-        help="use first frame of each episode",
+        "--vibration_strength",
+        type=float,
+        default=60.0,  # 默认最大振动幅度为5个像素
+        help="（可选）振动效果的最大强度（像素）。仅在--enable_vibration时生效。"
     )
 
     args = parser.parse_args()
-    playback_dataset(args)
+
+    if args.video_path is None:
+        base, ext = os.path.splitext(args.dataset)
+        suffix = "with_full_traj"
+        if args.enable_vibration:
+            suffix += "_vibration"
+        args.video_path = f"{base}_{suffix}.mp4"
+
+    generate_trajectory_video(args)

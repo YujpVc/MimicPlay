@@ -1,262 +1,329 @@
-"""
-A script to collect a batch of human play data (or task specific demonstrations).
-
-The demonstrations can be played back using the `playback_collected_playdata.py` script.
-"""
-
-import argparse
-import datetime
-import json
+import numpy as np
+import cv2
+from inputs import get_gamepad
+from threading import Thread, Lock
+from dataclasses import dataclass
+from typing import Dict
+import h5py
 import os
 import time
-from glob import glob
+import json
+from robomimic.envs.env_genesis import GenesisEnvWrapper
+from pyquaternion import Quaternion  # 引入四元数库
 
-import h5py
-import numpy as np
+# Controller state class
+@dataclass
+class ControllerState:
+    button_states: Dict[str, int]
+    analog_states: Dict[str, int]
 
-import sys
-sys.path.append("/home/yujp/robosuite")
-
-import robosuite as suite
-from robosuite import load_controller_config
-from robosuite.utils.input_utils import input2action
-from robosuite.wrappers import DataCollectionWrapper, VisualizationWrapper
-
-
-def collect_human_trajectory(env, device, arm, env_configuration):
-    """
-    Use the device (keyboard or SpaceNav 3D mouse) to collect a demonstration.
-    The rollout trajectory is saved to files in npz format.
-    Modify the DataCollectionWrapper wrapper to add new fields or change data formats.
-
-    Args:
-        env (MujocoEnv): environment to control
-        device (Device): to receive controls from the device
-        arms (str): which arm to control (eg bimanual) 'right' or 'left'
-        env_configuration (str): specified environment configuration
-    """
-
-    env.reset()
-
-    # ID = 2 always corresponds to agentview
-    env.render()
-
-    is_first = True
-
-    task_completion_hold_count = -1  # counter to collect 10 timesteps after reaching goal
-    device.start_control()
-
-    # Loop until we get a reset from the input or the task completes
-    while True:
-        # Set active robot
-        active_robot = env.robots[0] if env_configuration == "bimanual" else env.robots[arm == "left"]
-
-        # Get the newest action
-        action, grasp = input2action(
-            device=device, robot=active_robot, active_arm=arm, env_configuration=env_configuration
+class ControllerThread(Thread):
+    def __init__(self, callback=None):
+        super().__init__()
+        self.callback = callback
+        self.running = True
+        self.lock = Lock()
+        self.state = ControllerState(
+            button_states={
+                'BTN_SOUTH': 0, 'BTN_EAST': 0, 'BTN_WEST': 0, 'BTN_NORTH': 0,
+                'BTN_START': 0, 'BTN_SELECT': 0, 'BTN_TL': 0, 'BTN_TR': 0,
+                'BTN_THUMBL': 0, 'BTN_THUMBR': 0, 'BTN_MODE': 0
+            },
+            analog_states={
+                'ABS_X': 0, 'ABS_Y': 0, 'ABS_RX': 0, 'ABS_RY': 0,
+                'ABS_Z': 0, 'ABS_RZ': 0, 'ABS_HAT0X': 0, 'ABS_HAT0Y': 0
+            }
         )
+        self.event_thread = Thread(target=self.read_events)
 
-        # If action is none, then this a reset so we should break
-        if action is None:
-            break
+    def run(self):
+        self.event_thread.start()
+        while self.running:
+            with self.lock:
+                current_state = self.state
+            if self.callback:
+                self.callback(current_state)
+            time.sleep(0.05)
 
-        # Run environment step
-        env.step(action)
-        env.render()
+    def read_events(self):
+        while self.running:
+            try:
+                events = get_gamepad()
+                with self.lock:
+                    self._process_events(events)
+            except Exception as e:
+                print(f"Error: {e}")
+                time.sleep(0.1)
 
-        # Also break if we complete the task
-        if task_completion_hold_count == 0:
-            break
+    def _process_events(self, events):
+        for event in events:
+            if event.ev_type == 'Key':
+                self.state.button_states[event.code] = event.state
+            elif event.ev_type == 'Absolute':
+                self.state.analog_states[event.code] = event.state
 
-        # state machine to check for having a success for 10 consecutive timesteps
-        if env._check_success():
-            if task_completion_hold_count > 0:
-                task_completion_hold_count -= 1  # latched state, decrement count
-            else:
-                task_completion_hold_count = 10  # reset count on first success timestep
-        else:
-            task_completion_hold_count = -1  # null the counter if there's no success
+    def stop(self):
+        self.running = False
+        self.event_thread.join()
 
-    # cleanup for end of data collection episodes
-    env.close()
+# Data recording variables
+demos = []
+demo_count = 0
+current_demo = None
+last_recorded_pos = None
+last_recorded_quat = None
+last_recorded_gripper = None
 
+# Initialize GenesisEnvWrapper
+env = GenesisEnvWrapper(
+    env_name="Franka_Env",
+    env_config={
+        "env_name": "Franka_Env",
+        "type": 4,
+        "robots": ["Panda"],
+        "controller_configs": {
+            "type": "OSC_POSE",
+            "kp": [4500, 4500, 3500, 3500, 2000, 2000, 2000],
+            "damping": [450, 450, 350, 350, 200, 200, 200],
+        },
+        "has_renderer": True,
+        "control_freq": 20,
+    },
+    camera_width=640,
+    camera_height=480
+)
 
-def gather_demonstrations_as_hdf5(directory, out_dir, env_info):
-    """
-    Gathers the demonstrations saved in @directory into a
-    single hdf5 file.
+# Control parameters
+SPEED_XY = 0.5
+SPEED_Z = 0.2
+ROT_SPEED = 1.0
+DEADZONE = 0.15
+DATA_INTERVAL = 0.05  # 20Hz
+controller_thread = ControllerThread()
+controller_thread.start()
 
-    The strucure of the hdf5 file is as follows.
+# Data saving path
+tmp_dir = f"/home/yujp/MimicPlay/mimicplay/datasets/demo/demo{time.strftime('%Y%m%d%H%M')}"
+os.makedirs(tmp_dir, exist_ok=True)
 
-    data (group)
-        date (attribute) - date of collection
-        time (attribute) - time of collection
-        repository_version (attribute) - repository version used during collection
-        env (attribute) - environment name on which demos were collected
+# Time control
+sim_time_total = 0.0
 
-        demo1 (group) - every demonstration has a group
-            model_file (attribute) - model xml string for demonstration
-            states (dataset) - flattened mujoco states
-            actions (dataset) - actions applied during demonstration
+def normalize(value, max_value=32768):
+    return max(min(value / max_value, 1.0), -1.0)
 
-        demo2 (group)
-        ...
+def apply_deadzone(value, deadzone):
+    return 0 if abs(value) < deadzone else value
 
-    Args:
-        directory (str): Path to the directory containing raw demonstrations.
-        out_dir (str): Path to where to store the hdf5 file.
-        env_info (str): JSON-encoded string containing environment information,
-            including controller and robot info
-    """
+try:
+    gripper_closed = False
+    prev_rt_pressed = False
+    # prev_y_pressed = False
+    prev_x_pressed = False
+    # 初始化末端位置和姿态
+    current_pos = np.array([0.65, 0.0, 0.3])
+    current_quat = np.array([0, 1, 0, 0])  # 初始四元数
 
-    hdf5_path = os.path.join(out_dir, "demo.hdf5")
-    f = h5py.File(hdf5_path, "w")
+    obs = env.reset()
+    # 初始获取末端状态
+    current_pos = obs['robot0_eef_pos'].copy()
+    current_quat = obs['robot0_eef_quat'].copy()
 
-    # store some metadata in the attributes of one group
-    grp = f.create_group("data")
-
-    num_eps = 0
-    env_name = None  # will get populated at some point
-
-    for ep_directory in os.listdir(directory):
-
-        state_paths = os.path.join(directory, ep_directory, "state_*.npz")
-        states = []
-        actions = []
-        success = False
-
-        for state_file in sorted(glob(state_paths)):
-            dic = np.load(state_file, allow_pickle=True)
-            env_name = str(dic["env"])
-
-            states.extend(dic["states"])
-            for ai in dic["action_infos"]:
-                actions.append(ai["actions"])
-            success = success or dic["successful"]
-
-        if len(states) == 0:
-            continue
-
-        # Add collected play data demonstration to dataset
-        print("Demonstration has been saved")
-        # Delete the last state. This is because when the DataCollector wrapper
-        # recorded the states and actions, the states were recorded AFTER playing that action,
-        # so we end up with an extra state at the end.
-        del states[-1]
-        assert len(states) == len(actions)
-
-        num_eps += 1
-        ep_data_grp = grp.create_group("demo_{}".format(num_eps))
-
-        # store model xml as an attribute
-        xml_path = os.path.join(directory, ep_directory, "model.xml")
-        with open(xml_path, "r") as f:
-            xml_str = f.read()
-        ep_data_grp.attrs["model_file"] = xml_str
-
-        # write datasets for states and actions
-        ep_data_grp.create_dataset("states", data=np.array(states))
-        ep_data_grp.create_dataset("actions", data=np.array(actions))
-
-    # write dataset attributes (metadata)
-    now = datetime.datetime.now()
-    grp.attrs["date"] = "{}-{}-{}".format(now.month, now.day, now.year)
-    grp.attrs["time"] = "{}:{}:{}".format(now.hour, now.minute, now.second)
-    grp.attrs["repository_version"] = suite.__version__
-    grp.attrs["env"] = env_name
-    grp.attrs["env_info"] = env_info
-
-    f.close()
-
-if __name__ == "__main__":
-    # Arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--directory",
-        type=str,
-        default=os.path.join(suite.models.assets_root, "demonstrations"),
-    )
-    parser.add_argument("--environment", type=str, default="Libero_Kitchen_Tabletop_Manipulation")
-    parser.add_argument("--robots", nargs="+", type=list, default=["Panda"], help="Which robot(s) to use in the env")
-    parser.add_argument(
-        "--config", type=str, default="single-arm-opposed", help="Specified environment configuration if necessary"
-    )
-    parser.add_argument("--arm", type=str, default="right", help="Which arm to control (eg bimanual) 'right' or 'left'")
-    parser.add_argument("--camera", type=str, default="agentview", help="Which camera to use for collecting demos")
-    parser.add_argument(
-        "--controller", type=str, default="OSC_POSE", help="Choice of controller. Can be 'IK_POSE' or 'OSC_POSE'"
-    )
-    parser.add_argument("--device", type=str, default="keyboard")
-    parser.add_argument("--pos-sensitivity", type=float, default=1.0, help="How much to scale position user inputs")
-    parser.add_argument("--rot-sensitivity", type=float, default=1.0, help="How much to scale rotation user inputs")
-
-    parser.add_argument(
-        "--num-demonstration",
-        type=int,
-        default=50,
-        help="How much to scale rotation user inputs",
-    )
-    parser.add_argument("--bddl-file", type=str, default=None)
-    parser.add_argument("--task-id", type=int)
-
-    args = parser.parse_args()
-
-
-    # Get controller config
-    controller_config = load_controller_config(default_controller=args.controller)
-
-    # Create argument configuration
-    config = {
-        "env_name": args.environment,
-        "robots": args.robots,
-        "controller_configs": controller_config,
-        "bddl_file_name": args.bddl_file,
-    }
-
-    # Check if we're using a multi-armed environment and use env_configuration argument if so
-    if "TwoArm" in args.environment:
-        config["env_configuration"] = args.config
-
-    # Create environment
-    env = suite.make(
-        **config,
-        has_renderer=True,
-        has_offscreen_renderer=False,
-        render_camera=args.camera,
-        ignore_done=True,
-        use_camera_obs=False,
-        reward_shaping=True,
-        control_freq=20,
-    )
-
-    # Wrap this with visualization wrapper
-    env = VisualizationWrapper(env)
-
-    # Grab reference to controller config and convert it to json-encoded string
-    env_info = json.dumps(config)
-
-    # wrap the environment with data collection wrapper
-    tmp_directory = "/tmp/{}".format(str(time.time()).replace(".", "_"))
-    env = DataCollectionWrapper(env, tmp_directory)
-
-    # initialize device
-    if args.device == "keyboard":
-        from robosuite.devices import Keyboard
-
-        device = Keyboard(pos_sensitivity=args.pos_sensitivity, rot_sensitivity=args.rot_sensitivity)
-    elif args.device == "spacemouse":
-        from robosuite.devices import SpaceMouse
-
-        device = SpaceMouse(pos_sensitivity=args.pos_sensitivity, rot_sensitivity=args.rot_sensitivity)
-    else:
-        raise Exception("Invalid device choice: choose either 'keyboard' or 'spacemouse'.")
-
-    # make a new timestamped directory
-    t1, t2 = str(time.time()).split(".")
-    new_dir = os.path.join(args.directory, "{}_{}".format(t1, t2))
-    os.makedirs(new_dir)
-
-    # collect demonstrations
     while True:
-        collect_human_trajectory(env, device, args.arm, args.config)
-        gather_demonstrations_as_hdf5(tmp_directory, new_dir, env_info)
+        with controller_thread.lock:
+            state = controller_thread.state
+
+        # Get controller inputs
+        lx = normalize(state.analog_states.get('ABS_X', 0))
+        ly = normalize(state.analog_states.get('ABS_Y', 0))
+        rx = normalize(state.analog_states.get('ABS_RX', 0))
+        ry = normalize(state.analog_states.get('ABS_RY', 0))
+        lt = state.analog_states.get('ABS_Z', 0) / 255.0
+        rt = state.analog_states.get('ABS_RZ', 0) / 255.0
+        lb = state.button_states.get('BTN_TL', 0)
+        rb = state.button_states.get('BTN_TR', 0)
+        # y_pressed = state.button_states.get('BTN_WEST', 0)
+        x_pressed = state.button_states.get('BTN_NORTH', 0)
+
+        # Handle demo recording
+        if x_pressed and not prev_x_pressed:
+            if current_demo is None:  # Start new demo
+                current_demo = {
+                    'states': [],
+                    'actions': [],
+                    'timestamps': [],
+                    'demo_id': f"demo_{demo_count}",
+                    'start_time': sim_time_total,
+                    'next_record_time': sim_time_total,
+                }
+                demo_count += 1
+                print(f"Starting recording {current_demo['demo_id']}...")
+                env.reset()
+                current_pos = np.array([0.65, 0.0, 0.3])
+                current_quat = np.array([0, 1, 0, 0])
+                cube_x = np.random.uniform(0.4, 0.7)
+                cube_y = np.random.uniform(-0.5, 0.5)
+                env.scene.entities[2].set_pos(np.array([cube_x, cube_y, 0.02]))
+                obs = env.get_observation()
+                current_pos = obs['robot0_eef_pos'].copy()
+                current_quat = obs['robot0_eef_quat'].copy()
+                last_recorded_pos = None  # 重置
+                last_recorded_quat = None
+                last_recorded_gripper = None
+            else:  # Stop current demo
+                demos.append(current_demo)
+                print(f"Stopped recording, saved as {current_demo['demo_id']}")
+                current_demo = None
+                last_recorded_pos = None
+                last_recorded_quat = None
+                last_recorded_gripper = None
+        prev_x_pressed = x_pressed
+
+        # # 修改后的Y键处理逻辑
+        # if y_pressed and not prev_y_pressed:
+        #     # 设置目标位姿
+        #     target_pos = np.array([0.65, 0.0, 0.3])
+        #     target_quat = np.array([0, 1, 0, 0])  # 四元数格式需确认
+        #
+        #     try:
+        #         # 计算逆运动学
+        #         qpos = env.robot.inverse_kinematics(
+        #             link=env.end_effector,
+        #             pos=target_pos,
+        #             quat=target_quat
+        #         )
+        #
+        #         # 应用关节控制
+        #         env.robot.control_dofs_position(qpos[:-2], env.motors_dof)
+        #         env.robot.control_dofs_position([0.04, 0.04], env.fingers_dof)
+        #
+        #         env.step()
+        #         # 强制更新观测
+        #         print("Returned to initial GraspPose!")
+        #
+        #     except Exception as e:
+        #         print("Return failed")
+        #
+        #     gripper_closed = False
+        #
+        # prev_y_pressed = y_pressed
+
+        rt_pressed = rt > 0.1
+        if rt_pressed and not prev_rt_pressed:
+            gripper_closed = not gripper_closed
+        prev_rt_pressed = rt_pressed
+
+        # Apply deadzone
+        lx = apply_deadzone(lx, DEADZONE)
+        ly = apply_deadzone(ly, DEADZONE)
+        rx = apply_deadzone(rx, DEADZONE)
+        ry = apply_deadzone(ry, DEADZONE)
+
+        # 计算末端坐标系下的位移增量
+        current_q = Quaternion(current_quat)
+        local_x = -ly * SPEED_XY * env.env.dt
+        local_y = lx * SPEED_XY * env.env.dt
+        local_z = lt * SPEED_Z * env.env.dt if not lb else -lt * SPEED_Z * env.env.dt
+        local_move = np.array([local_x, local_y, local_z])
+        # 转换为世界坐标系
+        world_move = current_q.rotate(local_move)
+        dx, dy, dz = world_move
+
+        # 计算旋转分量
+        if rb:
+            # RB按下时，右摇杆X控制Z轴旋转
+            d_rz = rx * ROT_SPEED * env.env.dt
+            d_rx = 0.0
+            d_ry = 0.0
+        else:
+            # 未按下时，右摇杆控制X和Y轴旋转
+            d_rx = -rx * ROT_SPEED * env.env.dt
+            d_ry = -ry * ROT_SPEED * env.env.dt
+            d_rz = 0.0
+
+        gripper_signal = 1.0 if gripper_closed else -1.0
+        action = np.array([dx, dy, dz, d_rx, d_ry, d_rz, gripper_signal])
+
+        # Step the environment
+        obs, reward, done, info = env.step(action)
+        # 更新末端状态
+        current_pos = obs['robot0_eef_pos'].copy()
+        current_quat = obs['robot0_eef_quat'].copy()
+        env.render(mode="collect")
+        sim_time_total += env.env.dt
+
+        # Record data
+        if current_demo is not None:
+            print(f"sim_time_total: {sim_time_total}, next_record_time: {current_demo['next_record_time']}")  # 调试输出
+            while sim_time_total >= current_demo['next_record_time']:
+                sim_time_demo = current_demo['next_record_time'] - current_demo['start_time']
+                print(f"Recording timestamp: {sim_time_demo:.4f} s")
+                print(f"Recorded state: {state_vector.shape}, action: {action.shape}")  # 调试输出
+
+                # State (已在上文修改)
+                state_vector = np.concatenate([
+                    [sim_time_demo],
+                    obs["robot0_joint_pos"],
+                    obs["robot0_gripper_qpos"],
+                    obs["object"],
+                    obs["robot0_joint_vel"],
+                    obs["robot0_gripper_qvel"],
+                    env.scene.entities[2].get_vel().cpu().numpy().squeeze(),
+                    env.scene.entities[2].get_ang().cpu().numpy().squeeze()
+                ])
+                current_demo['states'].append(state_vector)
+
+                # Action: 计算差值
+                if last_recorded_pos is None:  # 第一次记录
+                    delta_pos = np.zeros(3)  # 初始动作假设为零
+                    delta_rot = np.zeros(3)
+                    action_gripper = gripper_signal
+                else:
+                    delta_pos = current_pos - last_recorded_pos
+                    q_last = Quaternion(last_recorded_quat)
+                    q_current = Quaternion(current_quat)
+                    q_delta = q_current * q_last.inverse
+                    delta_rot = np.array(q_delta.axis) * q_delta.angle
+                    action_gripper = gripper_signal
+
+                action = np.concatenate([delta_pos, delta_rot, [action_gripper]])
+                current_demo['actions'].append(action)
+                current_demo['timestamps'].append(sim_time_demo)
+                current_demo['next_record_time'] += DATA_INTERVAL
+
+                # 更新上一次记录的状态
+                last_recorded_pos = current_pos.copy()
+                last_recorded_quat = current_quat.copy()
+                last_recorded_gripper = gripper_signal
+
+except KeyboardInterrupt:
+    pass
+finally:
+    if current_demo is not None:
+        demos.append(current_demo)
+        print(f"Auto-saved unfinished demo: {current_demo['demo_id']}")
+
+    hdf5_path = os.path.join(tmp_dir, "demos.hdf5")
+    print(f"Saving {len(demos)} demos to HDF5 file...")
+    with h5py.File(hdf5_path, "w") as f:
+        grp = f.create_group("data")
+        grp.attrs["env"] = "Genesis Franka Environment"
+        grp.attrs["env_info"] = json.dumps(env.env_config)
+        grp.attrs["repository_version"] = "4.0.0"
+        total_samples = 0
+        for i, demo in enumerate(demos):
+            demo_grp = grp.create_group(f"demo_{i}")
+            demo_grp.attrs["num_samples"] = len(demo['states'])
+            demo_grp.attrs["timestamps"] = json.dumps(demo['timestamps'])
+            demo_grp.create_dataset("states", data=np.array(demo['states']))
+            demo_grp.create_dataset("actions", data=np.array(demo['actions']))
+            total_samples += len(demo['states'])
+        grp.attrs["total"] = total_samples
+    print(f"Successfully saved {len(demos)} demos to {hdf5_path}, total samples: {total_samples}")
+
+    controller_thread.stop()
+    controller_thread.join()
+    env.scene.close()
+    cv2.destroyAllWindows()
+
+    print("Program closed")

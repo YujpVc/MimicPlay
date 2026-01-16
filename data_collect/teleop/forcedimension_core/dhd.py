@@ -55,16 +55,13 @@ _lib.dhdGetLinearVelocity.argtypes = [
 _lib.dhdGetLinearVelocity.restype = ctypes.c_int
 
 # int dhdGetAngularVelocityDeg(double *vx, double *vy, double *vz, char ID);
-try:
-    _lib.dhdGetAngularVelocityDeg.argtypes = [
-        ctypes.POINTER(ctypes.c_double),
-        ctypes.POINTER(ctypes.c_double),
-        ctypes.POINTER(ctypes.c_double),
-        ctypes.c_byte
-    ]
-    _lib.dhdGetAngularVelocityDeg.restype = ctypes.c_int
-except AttributeError:
-    pass
+_lib.dhdGetAngularVelocityDeg.argtypes = [
+    ctypes.POINTER(ctypes.c_double),
+    ctypes.POINTER(ctypes.c_double),
+    ctypes.POINTER(ctypes.c_double),
+    ctypes.c_byte
+]
+_lib.dhdGetAngularVelocityDeg.restype = ctypes.c_int
 
 # const char* dhdErrorGetLastStr ();
 _lib.dhdErrorGetLastStr.argtypes = []
@@ -155,9 +152,6 @@ def getAngularVelocityDeg(vel, device_id):
     vy = ctypes.c_double()
     vz = ctypes.c_double()
     
-    if not hasattr(_lib, 'dhdGetAngularVelocityDeg'):
-        return -1
-
     ret = _lib.dhdGetAngularVelocityDeg(
         ctypes.byref(vx),
         ctypes.byref(vy),

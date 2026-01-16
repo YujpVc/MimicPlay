@@ -449,6 +449,9 @@ class RolloutPolicy(object):
             ob (dict): single observation dictionary from environment (no batch dimension,
                 and np.array values for each key)
         """
+        # IMPORTANT: ensure observation formatting matches training (HWC uint8 -> CHW float[0,1] for images)
+        # This relies on ObsUtils being initialized from the loaded config.
+        ob = ObsUtils.process_obs_dict(ob)
         ob = TensorUtils.to_tensor(ob)
         ob = TensorUtils.to_batch(ob)
         ob = TensorUtils.to_device(ob, self.policy.device)

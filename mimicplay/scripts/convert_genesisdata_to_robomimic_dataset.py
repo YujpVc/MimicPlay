@@ -16,7 +16,6 @@ import argparse
 import robomimic.envs.env_base as EB
 from robomimic.scripts.split_train_val import split_train_val_from_hdf5
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -32,10 +31,17 @@ if __name__ == "__main__":
     env_name = f["data"].attrs["env"]
     env_info = json.loads(f["data"].attrs["env_info"])
     env_meta = dict(
-        type=EB.EnvType.ROBOSUITE_TYPE,
-        env_name=env_name,
+        type=EB.EnvType.GENESIS,  # 明确指定为 GENESIS 类型
+        env_name="Genesis Franka Environment",
         env_version=f["data"].attrs["repository_version"],
-        env_kwargs=env_info,
+        env_kwargs={
+            "env_name": "Franka_Env",
+            # 根据 Genesis 的需求调整 env_kwargs
+            "robots": ["Panda"],
+            "control_freq": 20,
+            "render_camera": "gripper_cam",
+            # 删除不必要的 robosuite 特定参数，如 controller_configs
+        }
     )
     if "env_args" in f["data"].attrs:
         del f["data"].attrs["env_args"]
@@ -48,7 +54,7 @@ if __name__ == "__main__":
     total_samples = 0
     for ep in f["data"]:
         # ensure model-xml is in per-episode metadata
-        assert "model_file" in f["data/{}".format(ep)].attrs
+        # assert "model_file" in f["data/{}".format(ep)].attrs
 
         # add "num_samples" into per-episode metadata
         if "num_samples" in f["data/{}".format(ep)].attrs:
@@ -65,4 +71,4 @@ if __name__ == "__main__":
     f.close()
 
     # create 90-10 train-validation split in the dataset
-    split_train_val_from_hdf5(hdf5_path=args.dataset, val_ratio=0.03)
+    split_train_val_from_hdf5(hdf5_path=args.dataset, val_ratio=0.1)
