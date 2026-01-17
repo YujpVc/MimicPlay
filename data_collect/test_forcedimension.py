@@ -188,7 +188,7 @@ def main():
     max_pos_action = 0.08
     max_rot_action = 2.0
     pos_deadzone = 0.002
-    rot_deadzone = 0.002
+    rot_deadzone = 0.02
     rot_delta_gain = 4.0
     use_soft_saturation = True
     saturation_sharpness = 4.0
