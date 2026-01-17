@@ -16,13 +16,13 @@ import forcedimension_core.dhd as dhd
 import forcedimension_core.drd as drd
 
 class ForceDimensionExpert:
-    def __init__(self, device_id=0, scale_pos=0.5, scale_rot=1.0,
-                 rot_delta_gain=4.0,
+    def __init__(self, device_id=0, scale_pos=1.0, scale_rot=1.0,
+                 rot_delta_gain=2.0,
                  smooth_rot=True, smooth_alpha=0.08, use_slerp=True,
-                 max_pos_action=0.08, max_rot_action=2.0,
+                 max_pos_action=0.15, max_rot_action=0.3,
                  smooth_pos=True, pos_smooth_alpha=0.15,
-                 use_soft_saturation=True, saturation_sharpness=4.0,
-                 pos_deadzone=0.002, rot_deadzone=0.002):
+                 use_soft_saturation=True, saturation_sharpness=1.0,
+                 pos_deadzone=0.002, rot_deadzone=0.00002):
         """
         优化的 Force Dimension 专家策略，解决动作饱和和角度平滑问题
         

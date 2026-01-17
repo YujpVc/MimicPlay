@@ -181,18 +181,24 @@ def main():
     scale_pos = 0.5    # Match fairino_dataCollect.py
     scale_rot = 1.0
     smooth_rot = True
-    smooth_alpha = 0.3
+    smooth_alpha = 0.08
     use_slerp = True
     
     # New Parameters matching fairino_dataCollect.py
-    max_pos_action = 0.05
-    max_rot_action = 0.4
+    max_pos_action = 0.08
+    max_rot_action = 2.0
     pos_deadzone = 0.002
-    rot_deadzone = 0.2
+    rot_deadzone = 0.002
+    rot_delta_gain = 4.0
+    use_soft_saturation = True
+    saturation_sharpness = 4.0
+    smooth_pos = True
+    pos_smooth_alpha = 0.15
     
     print(f"\n[Configuration]")
     print(f"    Position Scale: {scale_pos}")
     print(f"    Rotation Scale: {scale_rot}")
+    print(f"    Rot Delta Gain: {rot_delta_gain}")
     print(f"    Max Pos Action: {max_pos_action}m")
     print(f"    Max Rot Action: {max_rot_action}rad")
     print(f"    Pos Deadzone:   {pos_deadzone}m")
@@ -209,13 +215,18 @@ def main():
             device_id=0, 
             scale_pos=scale_pos, 
             scale_rot=scale_rot,
+            rot_delta_gain=rot_delta_gain,
             smooth_rot=smooth_rot,
             smooth_alpha=smooth_alpha,
             use_slerp=use_slerp,
             max_pos_action=max_pos_action,
             max_rot_action=max_rot_action,
             pos_deadzone=pos_deadzone,
-            rot_deadzone=rot_deadzone
+            rot_deadzone=rot_deadzone,
+            use_soft_saturation=use_soft_saturation,
+            saturation_sharpness=saturation_sharpness,
+            smooth_pos=smooth_pos,
+            pos_smooth_alpha=pos_smooth_alpha
         )
     except Exception as e:
         print(f"\n❌ Failed to initialize Force Dimension device: {e}")

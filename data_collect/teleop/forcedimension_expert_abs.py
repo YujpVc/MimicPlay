@@ -16,39 +16,32 @@ import forcedimension_core.dhd as dhd
 import forcedimension_core.drd as drd
 
 class ForceDimensionExpert:
-    def __init__(self, device_id=0, scale_pos=0.8, scale_rot=1.5, 
-                 smooth_rot=True, smooth_alpha=0.12, use_slerp=True,
+    def __init__(self, device_id=0, scale_pos=1.0, scale_rot=1.0, 
+                 smooth_rot=True, smooth_alpha=0.08, use_slerp=True,
                  max_pos_action=0.15, max_rot_action=0.3,
-                 smooth_pos=True, pos_smooth_alpha=0.18,
-                 use_soft_saturation=True, saturation_sharpness=2.5,
-                 pos_deadzone=0.003, rot_deadzone=0.0003):
+                 smooth_pos=True, pos_smooth_alpha=0.15,
+                 use_soft_saturation=True, saturation_sharpness=2.0,
+                 pos_deadzone=0.002, rot_deadzone=0.001):
         """
         优化的 Force Dimension 专家策略，解决动作饱和和角度平滑问题
         
         Args:
             device_id: Force Dimension device ID
             scale_pos: Position scaling factor (提高以减少饱和，推荐 0.8-1.2)
-            scale_rot: Rotation scaling factor (提高以减少饱和，推荐 1.5-2.5)
+            scale_rot: Rotation scaling factor (提高以减少饱和，推荐 1.0-1.5)
             smooth_rot: Whether to apply smoothing to rotation output
             smooth_alpha: Rotation smoothing factor (0-1). Lower = smoother but more lag.
-                         推荐值: 0.10-0.15 for better smoothness
+                         推荐值: 0.05-0.10 for better smoothness
             use_slerp: Use quaternion SLERP for smoother rotation interpolation
                       (强烈推荐用于模仿学习，避免欧拉角突变)
             max_pos_action: Maximum position action range (meters) for soft saturation
-                           增大此值减少饱和，推荐 0.12-0.20
             max_rot_action: Maximum rotation action range (radians) for soft saturation
-                           增大此值减少旋转饱和，推荐 0.25-0.40
             smooth_pos: Whether to apply smoothing to position output (推荐开启)
             pos_smooth_alpha: Position smoothing factor (0-1). Lower = smoother.
-                             推荐值: 0.15-0.25 for imitation learning
             use_soft_saturation: Use tanh for soft saturation instead of hard clip
-                                (强烈推荐，避免硬截断导致的不平滑)
             saturation_sharpness: Sharpness of soft saturation curve
-                                 越大越接近线性（推荐 2.0-3.0）
             pos_deadzone: Position deadzone threshold (meters)
-                         更小的死区保留更多细微动作（推荐 0.002-0.005）
             rot_deadzone: Rotation deadzone threshold (radians)
-                         更小的死区保留更多细微旋转（推荐 0.0002-0.0005）
         """
         self.device_id = device_id
         self.scale_pos = scale_pos
@@ -57,7 +50,7 @@ class ForceDimensionExpert:
         self.smooth_alpha = smooth_alpha
         self.use_slerp = use_slerp
         
-        # Action normalization ranges (increased defaults to reduce saturation)
+        # Action normalization ranges
         self.max_pos_action = max_pos_action
         self.max_rot_action = max_rot_action
         
@@ -65,11 +58,11 @@ class ForceDimensionExpert:
         self.smooth_pos = smooth_pos
         self.pos_smooth_alpha = pos_smooth_alpha
         
-        # Soft saturation parameters (使用 tanh 避免硬饱和)
+        # Soft saturation parameters
         self.use_soft_saturation = use_soft_saturation
         self.saturation_sharpness = saturation_sharpness
         
-        # Deadzone thresholds (reduced to improve smoothness)
+        # Deadzone thresholds
         self.pos_deadzone = pos_deadzone
         self.rot_deadzone = rot_deadzone
         
@@ -97,26 +90,23 @@ class ForceDimensionExpert:
         
         # Initial state variables placeholder
         self.pos_prev_served = np.zeros(3)
-        self.mat_prev_served = np.eye(3)
+        
+        # Absolute Smoothing State
+        # We store the initial rotation (after auto-centering) as the reference
+        self.rot_ref = R.from_matrix(np.eye(3))
         
         # Smoothing filters for position
         self.pos_smoothed = np.zeros(3)
         self.pos_initialized = False
         
-        # Smoothing filters for rotation
-        if self.use_slerp:
-            # Use quaternion for SLERP (Spherical Linear Interpolation)
-            self.rot_smoothed_quat = R.from_euler('xyz', [0, 0, 0])  # Identity rotation
-        else:
-            # Use euler angles for EMA
-            self.rot_smoothed = np.zeros(3)
         self.rot_initialized = False
         
         # Shared state for thread communication
         self.running = True
         self.latest_pos = np.zeros(3)
         self.latest_rot = np.eye(3)
-        self.latest_vel = np.zeros(3) # 新增：用于存储速度
+        self.latest_vel = np.zeros(3)
+        self.latest_ang_vel = np.zeros(3) # Angular velocity for damping
         self.latest_buttons = 0
         self.latest_gripper_angle = 0
         self.lock = threading.Lock()
@@ -126,16 +116,19 @@ class ForceDimensionExpert:
         self.thread = threading.Thread(target=self._haptic_loop, daemon=True)
         self.thread.start()
 
-        # --- 关键修改：等待归中稳定 ---
+        # --- Wait for auto-centering stability ---
         print("Force Dimension: Auto-centering... (Waiting 2s)")
         time.sleep(2.0) 
 
-        # --- 关键修改：重置上一帧状态 ---
-        # 归中完成后，重新读取当前位置作为“上一帧”，防止第一帧Action出现巨大的跳变
+        # --- Reset initial state ---
         with self.lock:
             # 更新 prev 为 归中后 的状态
             self.pos_prev_served = self.latest_pos.copy()
-            self.mat_prev_served = self.latest_rot.copy()
+            # Initialize reference rotation to current actual rotation
+            self.rot_ref = R.from_matrix(self.latest_rot.copy())
+            self.pos_smoothed = self.latest_pos.copy() * self.scale_pos
+            self.pos_initialized = True
+            self.rot_initialized = True
         
         print("Force Dimension: Ready.")
         
@@ -146,17 +139,21 @@ class ForceDimensionExpert:
         """
         # Constants
         K_spring = 200.0   # N/m (P gain)
-        K_damping = 10.0   # N/(m/s) (D gain) - 增加阻尼防止震荡
-        K_integral = 80.0  # N/(m*s) (I gain) - 积分项，用于消除重力导致的稳态误差
-        K_torsion = 5.0    # Nm/rad
+        K_damping = 8.0    # N/(m/s) (D gain) - Linear Damping
+        K_integral = 50.0  # N/(m*s) (I gain)
+        
+        # Rotation Constants (Added Damping)
+        K_torsion = 3.0    # Nm/rad (Rotational Spring) - Slightly softer
+        K_rot_damping = 0.05 # Nm/(rad/s) (Rotational Damping) - NEW: Prevent jitter
         
         pos = np.zeros(3)
         rot = np.eye(3)
-        vel = np.zeros(3)  # Velocity buffer
-        integral_error = np.zeros(3) # 积分误差累积
+        vel = np.zeros(3)  
+        ang_vel_deg = np.zeros(3)
+        integral_error = np.zeros(3) 
         gripper_ptr = ctypes.pointer(ctypes.c_double(0.0))
         
-        loop_dt = 0.001 # 假设 1kHz 循环
+        loop_dt = 0.001 
         
         while self.running:
             # 1. Read Device State
@@ -164,8 +161,10 @@ class ForceDimensionExpert:
                 time.sleep(loop_dt)
                 continue
             
-            # 读取线速度用于阻尼计算
+            # Read velocities
             dhd.getLinearVelocity(vel, self.id)
+            dhd.getAngularVelocityDeg(ang_vel_deg, self.id)
+            ang_vel = np.deg2rad(ang_vel_deg)
             
             dhd.getGripperAngleDeg(gripper_ptr, self.id)
             gripper_angle = int(gripper_ptr.contents.value)
@@ -176,40 +175,41 @@ class ForceDimensionExpert:
                 self.latest_pos[:] = pos
                 self.latest_rot[:] = rot
                 self.latest_vel[:] = vel
+                self.latest_ang_vel[:] = ang_vel
                 self.latest_buttons = btn
                 self.latest_gripper_angle = gripper_angle
             
             # 3. Calculate Forces (PID Control)
-            # 积分误差累积 (I项)
-            # 只有当位置比较接近中心时才积分，防止大幅度运动时积分过大
+            # Position Integral
             if np.linalg.norm(pos) < 0.05: 
                 integral_error += pos * loop_dt
             else:
-                # 距离太远时（比如人为拖动），暂时冻结积分或缓慢衰减，防止松手后反弹过猛
-                integral_error *= 0.99
+                integral_error *= 0.98 # Decay faster when away
             
-            # Anti-windup: 限制积分项产生的力不超过一定范围 (例如 3N，足以抵抗重力但不会伤人)
             max_integral_force = 3.0
             max_integral_val = max_integral_force / K_integral
             integral_error = np.clip(integral_error, -max_integral_val, max_integral_val)
 
-            # F = -K_p * x - K_i * sum(x) - K_d * v
+            # Linear Force: F = -Kp*x - Ki*sum(x) - Kd*v
             force = -K_spring * pos - K_integral * integral_error - K_damping * vel
             
-            # Clamp Force (Safety)
+            # Safety Clamp Linear Force
             force_mag = np.linalg.norm(force)
-            if force_mag > 15.0: #稍微放宽一点上限给阻尼发挥作用
+            if force_mag > 15.0: 
                 force = force * (15.0 / force_mag)
                 
-            # Orientation Spring (Torque)
+            # Rotational Torque (PD Control)
+            # Spring to center
             r = R.from_matrix(rot)
-            rot_vec = r.as_rotvec()
-            torque = -K_torsion * rot_vec
+            rot_vec = r.as_rotvec() # Rotation vector from identity
             
-            # Clamp Torque (Safety)
+            # T = -Kp_rot * theta - Kd_rot * omega
+            torque = -K_torsion * rot_vec - K_rot_damping * ang_vel
+            
+            # Safety Clamp Torque
             torque_mag = np.linalg.norm(torque)
-            if torque_mag > 0.5:
-                torque = torque * (0.5 / torque_mag)
+            if torque_mag > 0.4:
+                torque = torque * (0.4 / torque_mag)
                 
             # 4. Apply Forces to Device
             dhd.setForceAndTorqueAndGripperForce(
@@ -219,12 +219,12 @@ class ForceDimensionExpert:
                 self.id
             )
             
-            # 1kHz loop rate is handled by DHD usually, but sleep helps if DHD is non-blocking
             time.sleep(0.001)
             
     def get_action(self, obs=None):
         """
         Reads the latest device state and returns the action.
+        Uses Absolute Orientation Smoothing for smoother rotation control.
         """
         with self.lock:
             pos_curr = self.latest_pos.copy()
@@ -234,65 +234,50 @@ class ForceDimensionExpert:
         # --- POSITION MAPPING (ABSOLUTE) ---
         raw_pos_input = pos_curr * self.scale_pos
         
-        # Apply smoothing filter to position if enabled
+        # Smoothing Position
         if self.smooth_pos:
             if not self.pos_initialized:
                 self.pos_smoothed = raw_pos_input.copy()
                 self.pos_initialized = True
             else:
-                # Exponential Moving Average (EMA)
                 self.pos_smoothed = (self.pos_smooth_alpha * raw_pos_input + 
                                     (1 - self.pos_smooth_alpha) * self.pos_smoothed)
             smoothed_pos_input = self.pos_smoothed
         else:
             smoothed_pos_input = raw_pos_input
         
-        # --- ROTATION MAPPING (RELATIVE) ---
-        R_curr = mat_curr
-        R_prev = self.mat_prev_served
-        # Calculate Delta Rotation: R_diff = R_curr @ R_prev.T
-        R_diff = R_curr @ np.linalg.inv(R_prev)
-        R_diff_rot = R.from_matrix(R_diff)
+        # --- ROTATION MAPPING (ABSOLUTE REFERENCE) ---
+        # 1. Get current absolute rotation
+        quat_curr = R.from_matrix(mat_curr)
         
-        # Apply smoothing filter to rotation if enabled
+        # 2. Calculate Difference from INITIAL REFERENCE to CURRENT
+        # R_diff = R_curr * inv(R_ref)
+        # This gives the absolute orientation change relative to the start
+        R_diff = quat_curr * self.rot_ref.inv()
+        
+        # 3. Convert to Euler angles (representing the total rotation from start)
+        raw_euler = R_diff.as_euler('xyz') * self.scale_rot
+        
+        # 4. Apply Smoothing if enabled (Low-pass filter on the output angles)
         if self.smooth_rot:
-            if self.use_slerp:
-                # Use Quaternion SLERP for smoother interpolation
-                if not self.rot_initialized:
-                    # Initialize with identity (no rotation)
-                    self.rot_smoothed_quat = R_diff_rot
-                    self.rot_initialized = True
-                else:
-                    # SLERP between previous smoothed and current
-                    # scipy's Slerp expects an array of Rotation objects
-                    key_rots = R.concatenate([self.rot_smoothed_quat, R_diff_rot])
-                    slerp = Slerp([0, 1], key_rots)
-                    # Interpolate at alpha position (closer to new value)
-                    self.rot_smoothed_quat = slerp(self.smooth_alpha)
-                delta_euler = self.rot_smoothed_quat.as_euler('xyz') * self.scale_rot
-            else:
-                # Use EMA on euler angles (simpler but less smooth)
-                delta_euler_raw = R_diff_rot.as_euler('xyz') * self.scale_rot
-                if not self.rot_initialized:
-                    self.rot_smoothed = delta_euler_raw.copy()
-                    self.rot_initialized = True
-                else:
-                    self.rot_smoothed = (self.smooth_alpha * delta_euler_raw + 
-                                        (1 - self.smooth_alpha) * self.rot_smoothed)
-                delta_euler = self.rot_smoothed
+             if not hasattr(self, 'euler_smoothed'):
+                 self.euler_smoothed = np.zeros(3)
+                 
+             # Exponential Moving Average
+             self.euler_smoothed = (self.smooth_alpha * raw_euler + 
+                                   (1 - self.smooth_alpha) * self.euler_smoothed)
+             delta_euler = self.euler_smoothed
         else:
-            # No smoothing
-            delta_euler = R_diff_rot.as_euler('xyz') * self.scale_rot
-        
-        # Deadzones (使用可配置的死区阈值)
+             delta_euler = raw_euler
+
+        # Deadzones
         if np.linalg.norm(smoothed_pos_input) < self.pos_deadzone:
             smoothed_pos_input[:] = 0.0
         if np.linalg.norm(delta_euler) < self.rot_deadzone:
             delta_euler[:] = 0.0
 
         # Mapping (Position - Absolute, Smoothed)
-        # Assuming FD mapping: x(right), y(up), z(back/front)
-        # Target mapping: x(forward), y(left), z(up) -> Adjust as per your robot frame
+        # Target: x(forward), y(left), z(up) 
         pos_action = np.zeros(3)
         pos_action[0] = -smoothed_pos_input[1] # -Y -> X
         pos_action[1] = smoothed_pos_input[0]  # X  -> Y
@@ -306,13 +291,9 @@ class ForceDimensionExpert:
         
         # Normalize to [-1, 1] range
         if self.use_soft_saturation:
-            # 使用 tanh 进行软归一化，避免硬饱和
-            # tanh(x) 在 [-1, 1] 之间平滑变化，不会突然裁剪
-            # saturation_sharpness 控制饱和曲线的陡峭程度（越大越接近线性）
             pos_action_normalized = np.tanh((pos_action / self.max_pos_action) * self.saturation_sharpness)
             rot_action_normalized = np.tanh((rot_action / self.max_rot_action) * self.saturation_sharpness)
         else:
-            # 传统的硬裁剪方式
             pos_action_normalized = np.clip(pos_action / self.max_pos_action, -1.0, 1.0)
             rot_action_normalized = np.clip(rot_action / self.max_rot_action, -1.0, 1.0)
         
@@ -321,15 +302,18 @@ class ForceDimensionExpert:
         action[:3] = pos_action_normalized
         action[3:6] = rot_action_normalized
         
-        # Gripper (already in [-1, 1])
+        # Gripper
+        # Invert gripper logic if needed: 
+        # Currently: < 16 (Closed) -> -1.0, >= 16 (Open) -> 1.0
+        # This matches standard convention (-1 = close, 1 = open)
         if gripper_angle < 16:
             action[6] = -1.0 
         else:
             action[6] = 1.0
         
-        # Update previous served state
+        # Store prev served not strictly needed for rotation logic anymore, 
+        # but kept if we revert to other methods
         self.pos_prev_served = pos_curr
-        self.mat_prev_served = mat_curr
         
         return action, {"gripper_angle": gripper_angle}
 
