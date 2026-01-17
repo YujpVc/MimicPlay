@@ -22,7 +22,7 @@ class ForceDimensionExpert:
                  max_pos_action=0.08, max_rot_action=2.0,
                  smooth_pos=True, pos_smooth_alpha=0.15,
                  use_soft_saturation=True, saturation_sharpness=4.0,
-                 pos_deadzone=0.002, rot_deadzone=0.002):
+                 pos_deadzone=0.002, rot_deadzone=0.02):
         """
         优化的 Force Dimension 专家策略，解决动作饱和和角度平滑问题
         
@@ -283,10 +283,23 @@ class ForceDimensionExpert:
              delta_euler = raw_euler
 
         # Deadzones
-        if np.linalg.norm(smoothed_pos_input) < self.pos_deadzone:
+        pos_mag = np.linalg.norm(smoothed_pos_input)
+        if pos_mag < self.pos_deadzone:
             smoothed_pos_input[:] = 0.0
-        # Apply per-axis deadzone for rotation to keep small motions
-        delta_euler[np.abs(delta_euler) < self.rot_deadzone] = 0.0
+            pos_mag = 0.0
+
+        # Dynamic Rotation Deadzone
+        # If position is moving, increase rotation deadzone to prevent accidental rotation (Cross-coupling filter)
+        effective_rot_deadzone = self.rot_deadzone
+        if pos_mag > 0.005:  # If there is intended translation
+             effective_rot_deadzone *= 4.0  # Apply stricter rotation threshold during translation
+        
+        # Apply magnitude-based deadzone first
+        if np.linalg.norm(delta_euler) < effective_rot_deadzone:
+             delta_euler[:] = 0.0
+        else:
+             # Apply per-axis deadzone for rotation to keep small motions
+             delta_euler[np.abs(delta_euler) < self.rot_deadzone] = 0.0
 
         # Mapping (Position - Absolute, Smoothed)
         # Target: x(forward), y(left), z(up) 

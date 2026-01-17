@@ -502,19 +502,21 @@ def main():
         device_id=0, 
         scale_pos=0.5, 
         scale_rot=1.0,
-        smooth_rot=True,    # Enable rotation smoothing for better IL data quality
-        smooth_alpha=0.3,   # Smoothing factor (lower = smoother, 0.2-0.5 recommended)
-        use_slerp=True,     # Use quaternion SLERP for smoothest rotation
-        # Use larger ranges than env_config to prevent saturation (high sensitivity)
-        # Handle range: 0.2m = 20cm before max speed
-        max_pos_action=0.05, 
-        max_rot_action=0.4,
-        # Increase deadzones to prevent drift when "stopped"
-        pos_deadzone=0.002, # Back to 2mm (responsive position)
-        rot_deadzone=0.2    # ~11.5 degrees (Large safety zone for rotation)
+        rot_delta_gain=4.0,
+        smooth_rot=True,
+        smooth_alpha=0.08,
+        use_slerp=True,
+        max_pos_action=0.08, 
+        max_rot_action=2.0,
+        pos_deadzone=0.002, 
+        rot_deadzone=0.02,
+        use_soft_saturation=True,
+        saturation_sharpness=4.0,
+        smooth_pos=True,
+        pos_smooth_alpha=0.15
     )
-    print("    Force Dimension Ready (with rotation smoothing).")
-    print(f"    Action range (Handle): pos=±0.05m, rot=±0.4rad")
+    print("    Force Dimension Ready.")
+    print(f"    Settings synced with test_forcedimension.py")
     
     # 3. Start Collector
     collector = DataCollector(env, expert, args.save_dir)
