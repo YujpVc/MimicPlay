@@ -292,7 +292,7 @@ class ForceDimensionExpert:
         # If position is moving, increase rotation deadzone to prevent accidental rotation (Cross-coupling filter)
         effective_rot_deadzone = self.rot_deadzone
         if pos_mag > 0.005:  # If there is intended translation
-             effective_rot_deadzone *= 4.0  # Apply stricter rotation threshold during translation
+             effective_rot_deadzone *= 2.0  # Apply stricter rotation threshold during translation
         
         # Apply magnitude-based deadzone first
         if np.linalg.norm(delta_euler) < effective_rot_deadzone:
