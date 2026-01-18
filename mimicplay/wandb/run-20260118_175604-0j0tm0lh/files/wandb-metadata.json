@@ -1,0 +1,46 @@
+{
+  "os": "Linux-5.15.0-139-generic-x86_64-with-glibc2.31",
+  "python": "CPython 3.10.16",
+  "startedAt": "2026-01-18T09:56:04.711039Z",
+  "args": [
+    "--config",
+    "/home/yujp/MimicPlay_o/mimicplay/configs/highlevel.json",
+    "--dataset",
+    "/home/yujp/MimicPlay/data_collect/demos/demo_20260117_210731/demo_real_processed.hdf5"
+  ],
+  "program": "/home/yujp/MimicPlay_o/mimicplay/scripts/train.py",
+  "codePath": "mimicplay/scripts/train.py",
+  "codePathLocal": "scripts/train.py",
+  "git": {
+    "remote": "https://github.com/j96w/MimicPlay.git",
+    "commit": "334ad94390fb051093c332262986e44eb6d9d00b"
+  },
+  "email": "1334136382@qq.com",
+  "root": "/home/yujp/MimicPlay_o/mimicplay",
+  "host": "yujp",
+  "executable": "/home/yujp/anaconda3/envs/genesis/bin/python",
+  "cpu_count": 16,
+  "cpu_count_logical": 32,
+  "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "950090743808",
+      "used": "620362694656"
+    }
+  },
+  "memory": {
+    "total": "33309163520"
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce RTX 4060 Laptop GPU",
+      "memoryTotal": "8585740288",
+      "cudaCores": 3072,
+      "architecture": "Ada",
+      "uuid": "GPU-c672c470-06c9-8968-a368-4025ea26617c"
+    }
+  ],
+  "cudaVersion": "12.2",
+  "writerId": "vhvl77n5gsy567azlsfgyirgzziyebac"
+}

@@ -5,7 +5,9 @@
         "validate": true,
         "logging": {
             "terminal_output_to_txt": true,
-            "log_tb": true
+            "log_tb": true,
+            "log_wandb": true,
+            "wandb_proj_name": "mimicplay_lowlevel"
         },
         "save": {
             "enabled": true,
@@ -155,7 +157,7 @@
             "spatial_softmax_num_kp": 64,
             "gmm_min_std": 0.0001,
             "dropout": 0.1,
-            "trained_highlevel_planner": "checkpoints/highlevel_model_epoch_357_best_validation_-65.05948219299316.pth",
+            "trained_highlevel_planner": "/home/yujp/MimicPlay/trained_models_highlevel/highlevel_model_epoch_357_best_validation_-65.05948219299316.pth",
             "eval_goal_img_window": 30,
             "eval_max_goal_img_iter": 5
         },

@@ -1,0 +1,1361 @@
+/home/yujp/anaconda3/envs/genesis/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/yujp/anaconda3/envs/genesis/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+
+============= Model Summary =============
+ObservationKeyToModalityDict: mean not found, adding mean to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: scale not found, adding scale to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: logits not found, adding logits to mapping with assumed low_dim modality!
+Highlevel_GMM_pretrain (
+  ModuleDict(
+    (policy): GMMActorNetwork(
+        action_dim=30
+        num_modes=5
+        min_std=0.0001
+        std_activation=softplus
+        low_noise_eval=False
+
+        encoder=ObservationGroupEncoder(
+            group=obs
+            ObservationEncoder(
+                Key(
+                    name=agentview_image
+                    shape=[3, 84, 84]
+                    modality=rgb
+                    randomizer=CropRandomizer(input_shape=[3, 84, 84], crop_size=[76, 76], num_crops=1)
+                    net=VisualCore(
+                      input_shape=[3, 76, 76]
+                      output_shape=[64]
+                      backbone_net=ResNet18Conv(input_channel=3, input_coord_conv=False)
+                      pool_net=None
+                    )
+                    sharing_from=None
+                )
+                Key(
+                    name=robot0_eef_pos
+                    shape=[3]
+                    modality=low_dim
+                    randomizer=None
+                    net=None
+                    sharing_from=None
+                )
+                output_shape=[67]
+            )
+            group=goal
+            ObservationEncoder(
+                Key(
+                    name=agentview_image
+                    shape=[3, 84, 84]
+                    modality=rgb
+                    randomizer=CropRandomizer(input_shape=[3, 84, 84], crop_size=[76, 76], num_crops=1)
+                    net=VisualCore(
+                      input_shape=[3, 76, 76]
+                      output_shape=[64]
+                      backbone_net=ResNet18Conv(input_channel=3, input_coord_conv=False)
+                      pool_net=None
+                    )
+                    sharing_from=None
+                )
+                output_shape=[64]
+            )
+        )
+
+        mlp=MLP(
+            input_dim=131
+            output_dim=400
+            layer_dims=[400]
+            layer_func=Linear
+            dropout=None
+            act=ReLU
+            output_act=ReLU
+        )
+
+        decoder=ObservationDecoder(
+            Key(
+                name=mean
+                shape=(5, 30)
+                modality=low_dim
+                net=(Linear(in_features=400, out_features=150, bias=True))
+            )
+            Key(
+                name=scale
+                shape=(5, 30)
+                modality=low_dim
+                net=(Linear(in_features=400, out_features=150, bias=True))
+            )
+            Key(
+                name=logits
+                shape=(5,)
+                modality=low_dim
+                net=(Linear(in_features=400, out_features=5, bias=True))
+            )
+        )
+    )
+  )
+)
+
+SequenceDataset: loading dataset into memory...
+100%|##########| 1/1 [00:00<00:00, 1360.46it/s]
+SequenceDataset: loading dataset into memory...
+100%|##########| 1/1 [00:00<00:00, 1245.71it/s]
+
+============= Training Dataset =============
+PlaydataSequenceDataset (
+	path=/home/yujp/MimicPlay/data_collect/demos/demo_20260117_210731/demo_real_processed.hdf5
+	obs_keys=('agentview_image', 'robot0_eef_pos', 'robot0_eef_pos_future_traj')
+	seq_length=1
+	filter_key=train
+	frame_stack=1
+	pad_seq_length=True
+	pad_frame_stack=True
+	goal_mode=nstep
+	cache_mode=low_dim
+	num_demos=1
+	num_sequences=848
+)
+
+100%|##########| 100/100 [00:04<00:00, 22.89it/s]
+Train Epoch 1
+{
+    "Log_Likelihood": 36.887522057294845,
+    "Loss": -36.887522057294845,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 11428060.97795594,
+    "Time_Data_Loading": 0.005292359987894694,
+    "Time_Epoch": 0.07309016784032187,
+    "Time_Log_Info": 0.01130271355311076,
+    "Time_Process_Batch": 0.001475675900777181,
+    "Time_Train_Batch": 0.05191557407379151
+}
+100%|##########| 10/10 [00:00<00:00, 52.28it/s]
+Validation Epoch 1
+{
+    "Log_Likelihood": 55.605747604370116,
+    "Loss": -55.605747604370116,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0009149750073750814,
+    "Time_Epoch": 0.003478113810221354,
+    "Time_Log_Info": 4.4941902160644535e-06,
+    "Time_Process_Batch": 0.00015191237131754556,
+    "Time_Train_Batch": 0.0021073500315348308
+}
+save checkpoint to /home/yujp/MimicPlay/mimicplay/../trained_models_highlevel/test/20260118175602/models/model_epoch_1_best_validation_-55.605747604370116.pth
+
+Epoch 1 Memory Usage: 1591 MB
+
+100%|##########| 100/100 [00:03<00:00, 26.33it/s]
+Train Epoch 2
+{
+    "Log_Likelihood": 58.27224853515625,
+    "Loss": -58.27224853515625,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 14969625.398440633,
+    "Time_Data_Loading": 0.006017931302388509,
+    "Time_Epoch": 0.06383498112360636,
+    "Time_Log_Info": 0.011606049537658692,
+    "Time_Process_Batch": 0.0011695106824239096,
+    "Time_Train_Batch": 0.040889461835225425
+}
+100%|##########| 10/10 [00:00<00:00, 72.06it/s]
+Validation Epoch 2
+{
+    "Log_Likelihood": 58.86063499450684,
+    "Loss": -58.86063499450684,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0012085755666097005,
+    "Time_Epoch": 0.002612435817718506,
+    "Time_Log_Info": 3.981590270996094e-06,
+    "Time_Process_Batch": 9.14295514424642e-05,
+    "Time_Train_Batch": 0.0010007341702779134
+}
+save checkpoint to /home/yujp/MimicPlay/mimicplay/../trained_models_highlevel/test/20260118175602/models/model_epoch_2_best_validation_-58.86063499450684.pth
+
+Epoch 2 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:03<00:00, 26.27it/s]
+Train Epoch 3
+{
+    "Log_Likelihood": 59.405207595825196,
+    "Loss": -59.405207595825196,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 12867322.406350913,
+    "Time_Data_Loading": 0.005526284376780192,
+    "Time_Epoch": 0.06399042208989461,
+    "Time_Log_Info": 0.011851882934570313,
+    "Time_Process_Batch": 0.0011123220125834148,
+    "Time_Train_Batch": 0.04153474966684977
+}
+100%|##########| 10/10 [00:00<00:00, 74.55it/s]
+Validation Epoch 3
+{
+    "Log_Likelihood": 59.25244026184082,
+    "Loss": -59.25244026184082,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0009871959686279298,
+    "Time_Epoch": 0.002548694610595703,
+    "Time_Log_Info": 5.145867665608724e-06,
+    "Time_Process_Batch": 0.0001271367073059082,
+    "Time_Train_Batch": 0.0011049866676330566
+}
+save checkpoint to /home/yujp/MimicPlay/mimicplay/../trained_models_highlevel/test/20260118175602/models/model_epoch_3_best_validation_-59.25244026184082.pth
+
+Epoch 3 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:04<00:00, 24.02it/s]
+Train Epoch 4
+{
+    "Log_Likelihood": 59.86878753662109,
+    "Loss": -59.86878753662109,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 10552249.603842238,
+    "Time_Data_Loading": 0.006394716103871664,
+    "Time_Epoch": 0.06998639504114787,
+    "Time_Log_Info": 0.0118232528368632,
+    "Time_Process_Batch": 0.0013348897298177083,
+    "Time_Train_Batch": 0.045504836241404216
+}
+100%|##########| 10/10 [00:00<00:00, 62.42it/s]
+Validation Epoch 4
+{
+    "Log_Likelihood": 58.55695915222168,
+    "Loss": -58.55695915222168,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.001310567061106364,
+    "Time_Epoch": 0.0029991428057352704,
+    "Time_Log_Info": 7.359186808268229e-06,
+    "Time_Process_Batch": 0.00014650821685791016,
+    "Time_Train_Batch": 0.0011905113855997722
+}
+
+Epoch 4 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:04<00:00, 24.29it/s]
+Train Epoch 5
+{
+    "Log_Likelihood": 59.9589315032959,
+    "Loss": -59.9589315032959,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 9787295.887934811,
+    "Time_Data_Loading": 0.006574654579162597,
+    "Time_Epoch": 0.06931777000427246,
+    "Time_Log_Info": 0.01177607774734497,
+    "Time_Process_Batch": 0.0013711055119832356,
+    "Time_Train_Batch": 0.045100144545237225
+}
+100%|##########| 10/10 [00:00<00:00, 64.19it/s]
+Validation Epoch 5
+{
+    "Log_Likelihood": 58.62058296203613,
+    "Loss": -58.62058296203613,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0013405521710713705,
+    "Time_Epoch": 0.0029650330543518066,
+    "Time_Log_Info": 1.426537831624349e-05,
+    "Time_Process_Batch": 0.00012099345525105795,
+    "Time_Train_Batch": 0.0011060436566670735
+}
+
+Epoch 5 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:03<00:00, 25.28it/s]
+Train Epoch 6
+{
+    "Log_Likelihood": 59.9558755493164,
+    "Loss": -59.9558755493164,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 9032698.114041258,
+    "Time_Data_Loading": 0.006303735574086507,
+    "Time_Epoch": 0.06649365027745564,
+    "Time_Log_Info": 0.011729609966278077,
+    "Time_Process_Batch": 0.0012663602828979492,
+    "Time_Train_Batch": 0.04308143456776937
+}
+100%|##########| 10/10 [00:00<00:00, 66.95it/s]
+Validation Epoch 6
+{
+    "Log_Likelihood": 58.98303642272949,
+    "Loss": -58.98303642272949,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0011954228083292642,
+    "Time_Epoch": 0.002836306889851888,
+    "Time_Log_Info": 4.887580871582031e-06,
+    "Time_Process_Batch": 0.0001234889030456543,
+    "Time_Train_Batch": 0.0011540929476420085
+}
+
+Epoch 6 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:03<00:00, 25.77it/s]
+Train Epoch 7
+{
+    "Log_Likelihood": 59.809509468078616,
+    "Loss": -59.809509468078616,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 8713676.431643697,
+    "Time_Data_Loading": 0.006193176905314127,
+    "Time_Epoch": 0.06523662010828654,
+    "Time_Log_Info": 0.011700268586476643,
+    "Time_Process_Batch": 0.001254721482594808,
+    "Time_Train_Batch": 0.04206845760345459
+}
+100%|##########| 10/10 [00:00<00:00, 69.21it/s]
+Validation Epoch 7
+{
+    "Log_Likelihood": 60.99930610656738,
+    "Loss": -60.99930610656738,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0011836806933085123,
+    "Time_Epoch": 0.0027494470278422037,
+    "Time_Log_Info": 8.797645568847656e-06,
+    "Time_Process_Batch": 0.0001347939173380534,
+    "Time_Train_Batch": 0.0010709245999654135
+}
+save checkpoint to /home/yujp/MimicPlay/mimicplay/../trained_models_highlevel/test/20260118175602/models/model_epoch_7_best_validation_-60.99930610656738.pth
+
+Epoch 7 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:04<00:00, 24.79it/s]
+Train Epoch 8
+{
+    "Log_Likelihood": 60.794722633361815,
+    "Loss": -60.794722633361815,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 7045714.768179421,
+    "Time_Data_Loading": 0.006459947427113851,
+    "Time_Epoch": 0.06777582963307699,
+    "Time_Log_Info": 0.011910009384155273,
+    "Time_Process_Batch": 0.001320052146911621,
+    "Time_Train_Batch": 0.04351113239924113
+}
+100%|##########| 10/10 [00:00<00:00, 69.22it/s]
+Validation Epoch 8
+{
+    "Log_Likelihood": 60.407948684692386,
+    "Loss": -60.407948684692386,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0012332677841186523,
+    "Time_Epoch": 0.0027220845222473145,
+    "Time_Log_Info": 7.760524749755859e-06,
+    "Time_Process_Batch": 0.00012202262878417969,
+    "Time_Train_Batch": 0.0010285536448160807
+}
+
+Epoch 8 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:04<00:00, 24.51it/s]
+Train Epoch 9
+{
+    "Log_Likelihood": 60.53769874572754,
+    "Loss": -60.53769874572754,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 7147887.358471227,
+    "Time_Data_Loading": 0.006360924243927002,
+    "Time_Epoch": 0.06854750315348307,
+    "Time_Log_Info": 0.011969403425852457,
+    "Time_Process_Batch": 0.0013355255126953126,
+    "Time_Train_Batch": 0.044802963733673096
+}
+100%|##########| 10/10 [00:00<00:00, 74.00it/s]
+Validation Epoch 9
+{
+    "Log_Likelihood": 59.81018142700195,
+    "Loss": -59.81018142700195,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0009540597597757976,
+    "Time_Epoch": 0.0026103933652242024,
+    "Time_Log_Info": 1.0502338409423827e-05,
+    "Time_Process_Batch": 0.0001471400260925293,
+    "Time_Train_Batch": 0.0011291980743408203
+}
+
+Epoch 9 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:03<00:00, 26.32it/s]
+Train Epoch 10
+{
+    "Log_Likelihood": 60.912617721557616,
+    "Loss": -60.912617721557616,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 6571056.584960874,
+    "Time_Data_Loading": 0.005782902240753174,
+    "Time_Epoch": 0.06386583248774211,
+    "Time_Log_Info": 0.01166077454884847,
+    "Time_Process_Batch": 0.0011805852254231771,
+    "Time_Train_Batch": 0.04136255582173665
+}
+100%|##########| 10/10 [00:00<00:00, 62.96it/s]
+Validation Epoch 10
+{
+    "Log_Likelihood": 61.38777847290039,
+    "Loss": -61.38777847290039,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0013162295023600261,
+    "Time_Epoch": 0.0029763062795003254,
+    "Time_Log_Info": 1.2600421905517578e-05,
+    "Time_Process_Batch": 0.0001304467519124349,
+    "Time_Train_Batch": 0.0011745333671569825
+}
+save checkpoint to /home/yujp/MimicPlay/mimicplay/../trained_models_highlevel/test/20260118175602/models/model_epoch_10_best_validation_-61.38777847290039.pth
+
+Epoch 10 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:03<00:00, 26.47it/s]
+Train Epoch 11
+{
+    "Log_Likelihood": 61.52044467926025,
+    "Loss": -61.52044467926025,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 5213582.287909243,
+    "Time_Data_Loading": 0.005429840087890625,
+    "Time_Epoch": 0.06352576812108358,
+    "Time_Log_Info": 0.011515259742736816,
+    "Time_Process_Batch": 0.0011466503143310546,
+    "Time_Train_Batch": 0.04149136940638224
+}
+100%|##########| 10/10 [00:00<00:00, 71.15it/s]
+Validation Epoch 11
+{
+    "Log_Likelihood": 62.83719139099121,
+    "Loss": -62.83719139099121,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0012253085772196452,
+    "Time_Epoch": 0.002689647674560547,
+    "Time_Log_Info": 8.702278137207031e-06,
+    "Time_Process_Batch": 0.00010258356730143229,
+    "Time_Train_Batch": 0.0009968996047973633
+}
+save checkpoint to /home/yujp/MimicPlay/mimicplay/../trained_models_highlevel/test/20260118175602/models/model_epoch_11_best_validation_-62.83719139099121.pth
+
+Epoch 11 Memory Usage: 1587 MB
+
+100%|##########| 100/100 [00:03<00:00, 26.81it/s]
+Train Epoch 12
+{
+    "Log_Likelihood": 61.61849784851074,
+    "Loss": -61.61849784851074,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 4739756.005535468,
+    "Time_Data_Loading": 0.00549861192703247,
+    "Time_Epoch": 0.06272433201471965,
+    "Time_Log_Info": 0.011558620134989421,
+    "Time_Process_Batch": 0.0010624925295511882,
+    "Time_Train_Batch": 0.040572317441304524
+}
+100%|##########| 10/10 [00:00<00:00, 70.03it/s]
+Validation Epoch 12
+{
+    "Log_Likelihood": 62.65601921081543,
+    "Loss": -62.65601921081543,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0011982917785644531,
+    "Time_Epoch": 0.0027053793271382648,
+    "Time_Log_Info": 5.861123402913411e-06,
+    "Time_Process_Batch": 0.00012295643488566081,
+    "Time_Train_Batch": 0.0010429143905639649
+}
+
+Epoch 12 Memory Usage: 1587 MB
+
+100%|##########| 100/100 [00:03<00:00, 27.36it/s]
+Train Epoch 13
+{
+    "Log_Likelihood": 61.36039279937744,
+    "Loss": -61.36039279937744,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 5167325.807750251,
+    "Time_Data_Loading": 0.005416679382324219,
+    "Time_Epoch": 0.061472209294637044,
+    "Time_Log_Info": 0.011627709865570069,
+    "Time_Process_Batch": 0.0010479609171549478,
+    "Time_Train_Batch": 0.039784125487009686
+}
+100%|##########| 10/10 [00:00<00:00, 71.61it/s]
+Validation Epoch 13
+{
+    "Log_Likelihood": 61.1950138092041,
+    "Loss": -61.1950138092041,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0011985858281453451,
+    "Time_Epoch": 0.002686138947804769,
+    "Time_Log_Info": 5.0942103068033855e-06,
+    "Time_Process_Batch": 0.00010124444961547851,
+    "Time_Train_Batch": 0.0010128339131673177
+}
+
+Epoch 13 Memory Usage: 1587 MB
+
+100%|##########| 100/100 [00:03<00:00, 26.97it/s]
+Train Epoch 14
+{
+    "Log_Likelihood": 61.72152278900146,
+    "Loss": -61.72152278900146,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 4501802.73307119,
+    "Time_Data_Loading": 0.005629920959472656,
+    "Time_Epoch": 0.062342508633931475,
+    "Time_Log_Info": 0.011494139830271402,
+    "Time_Process_Batch": 0.0010596354802449544,
+    "Time_Train_Batch": 0.04025938908259074
+}
+100%|##########| 10/10 [00:00<00:00, 71.27it/s]
+Validation Epoch 14
+{
+    "Log_Likelihood": 62.654105758666994,
+    "Loss": -62.654105758666994,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0011668086051940918,
+    "Time_Epoch": 0.0027193705240885417,
+    "Time_Log_Info": 7.816155751546224e-06,
+    "Time_Process_Batch": 9.640057881673177e-05,
+    "Time_Train_Batch": 0.0010567148526509603
+}
+
+Epoch 14 Memory Usage: 1587 MB
+
+100%|##########| 100/100 [00:03<00:00, 25.84it/s]
+Train Epoch 15
+{
+    "Log_Likelihood": 61.62580467224121,
+    "Loss": -61.62580467224121,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 4494607.890063793,
+    "Time_Data_Loading": 0.005982553958892823,
+    "Time_Epoch": 0.06498380899429321,
+    "Time_Log_Info": 0.011715956528981527,
+    "Time_Process_Batch": 0.0012259364128112793,
+    "Time_Train_Batch": 0.04206244548161824
+}
+100%|##########| 10/10 [00:00<00:00, 62.94it/s]
+Validation Epoch 15
+{
+    "Log_Likelihood": 61.77737731933594,
+    "Loss": -61.77737731933594,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.001378158728281657,
+    "Time_Epoch": 0.0030043760935465494,
+    "Time_Log_Info": 7.1605046590169275e-06,
+    "Time_Process_Batch": 0.00013058582941691081,
+    "Time_Train_Batch": 0.0011172294616699219
+}
+
+Epoch 15 Memory Usage: 1587 MB
+
+100%|##########| 100/100 [00:03<00:00, 25.94it/s]
+Train Epoch 16
+{
+    "Log_Likelihood": 61.6763302230835,
+    "Loss": -61.6763302230835,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 4523553.420593145,
+    "Time_Data_Loading": 0.005885799725850423,
+    "Time_Epoch": 0.06486794948577881,
+    "Time_Log_Info": 0.011785666147867838,
+    "Time_Process_Batch": 0.0011944532394409179,
+    "Time_Train_Batch": 0.04183166027069092
+}
+100%|##########| 10/10 [00:00<00:00, 62.76it/s]
+Validation Epoch 16
+{
+    "Log_Likelihood": 61.155997085571286,
+    "Loss": -61.155997085571286,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0014411846796671549,
+    "Time_Epoch": 0.002994243303934733,
+    "Time_Log_Info": 1.1471907297770182e-05,
+    "Time_Process_Batch": 0.0001251379648844401,
+    "Time_Train_Batch": 0.00106503963470459
+}
+
+Epoch 16 Memory Usage: 1587 MB
+
+100%|##########| 100/100 [00:03<00:00, 25.51it/s]
+Train Epoch 17
+{
+    "Log_Likelihood": 61.67770141601562,
+    "Loss": -61.67770141601562,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 4140792.0404687943,
+    "Time_Data_Loading": 0.0062749266624450685,
+    "Time_Epoch": 0.06597489913304647,
+    "Time_Log_Info": 0.011343594392140706,
+    "Time_Process_Batch": 0.001254892349243164,
+    "Time_Train_Batch": 0.04302819569905599
+}
+100%|##########| 10/10 [00:00<00:00, 70.26it/s]
+Validation Epoch 17
+{
+    "Log_Likelihood": 62.35165100097656,
+    "Loss": -62.35165100097656,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0011339982350667317,
+    "Time_Epoch": 0.0027472694714864095,
+    "Time_Log_Info": 8.674462636311849e-06,
+    "Time_Process_Batch": 0.00011620918909708659,
+    "Time_Train_Batch": 0.0011025110880533854
+}
+
+Epoch 17 Memory Usage: 1587 MB
+
+100%|##########| 100/100 [00:03<00:00, 26.53it/s]
+Train Epoch 18
+{
+    "Log_Likelihood": 61.36246349334717,
+    "Loss": -61.36246349334717,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 4484082.937988212,
+    "Time_Data_Loading": 0.0059492230415344235,
+    "Time_Epoch": 0.06335612138112386,
+    "Time_Log_Info": 0.011577598253885905,
+    "Time_Process_Batch": 0.001103520393371582,
+    "Time_Train_Batch": 0.04097575743993123
+}
+100%|##########| 10/10 [00:00<00:00, 60.59it/s]
+Validation Epoch 18
+{
+    "Log_Likelihood": 62.70849761962891,
+    "Loss": -62.70849761962891,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0014967044194539388,
+    "Time_Epoch": 0.0031478285789489748,
+    "Time_Log_Info": 4.76837158203125e-06,
+    "Time_Process_Batch": 0.00011394023895263671,
+    "Time_Train_Batch": 0.0011237502098083497
+}
+
+Epoch 18 Memory Usage: 1587 MB
+
+100%|##########| 100/100 [00:03<00:00, 25.24it/s]
+Train Epoch 19
+{
+    "Log_Likelihood": 62.03764854431152,
+    "Loss": -62.03764854431152,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 3433576.3997751134,
+    "Time_Data_Loading": 0.006027332941691081,
+    "Time_Epoch": 0.06656426191329956,
+    "Time_Log_Info": 0.01212448279062907,
+    "Time_Process_Batch": 0.0012080073356628418,
+    "Time_Train_Batch": 0.043365204334259035
+}
+100%|##########| 10/10 [00:00<00:00, 73.62it/s]
+Validation Epoch 19
+{
+    "Log_Likelihood": 62.502749633789065,
+    "Loss": -62.502749633789065,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0010253826777140299,
+    "Time_Epoch": 0.002621150016784668,
+    "Time_Log_Info": 7.458527882893881e-06,
+    "Time_Process_Batch": 0.00010439952214558919,
+    "Time_Train_Batch": 0.0011152982711791991
+}
+
+Epoch 19 Memory Usage: 1587 MB
+
+100%|##########| 100/100 [00:03<00:00, 25.26it/s]
+Train Epoch 20
+{
+    "Log_Likelihood": 62.174248123168944,
+    "Loss": -62.174248123168944,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 3609126.679003706,
+    "Time_Data_Loading": 0.006077885627746582,
+    "Time_Epoch": 0.0665108323097229,
+    "Time_Log_Info": 0.012226641178131104,
+    "Time_Process_Batch": 0.0011729200681050618,
+    "Time_Train_Batch": 0.04308396577835083
+}
+100%|##########| 10/10 [00:00<00:00, 66.47it/s]
+Validation Epoch 20
+{
+    "Log_Likelihood": 60.906973648071286,
+    "Loss": -60.906973648071286,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.001213812828063965,
+    "Time_Epoch": 0.002856655915578206,
+    "Time_Log_Info": 4.97897466023763e-06,
+    "Time_Process_Batch": 0.00013672510782877605,
+    "Time_Train_Batch": 0.0011397997538248699
+}
+
+Epoch 20 Memory Usage: 1572 MB
+
+100%|##########| 100/100 [00:04<00:00, 24.59it/s]
+Train Epoch 21
+{
+    "Log_Likelihood": 61.74329822540283,
+    "Loss": -61.74329822540283,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 3683284.133969037,
+    "Time_Data_Loading": 0.0063282450040181475,
+    "Time_Epoch": 0.06839280128479004,
+    "Time_Log_Info": 0.012224678198496501,
+    "Time_Process_Batch": 0.0013474742571512857,
+    "Time_Train_Batch": 0.04419442415237427
+}
+100%|##########| 10/10 [00:00<00:00, 69.53it/s]
+Validation Epoch 21
+{
+    "Log_Likelihood": 61.96406440734863,
+    "Loss": -61.96406440734863,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0011266350746154785,
+    "Time_Epoch": 0.0027644952138264974,
+    "Time_Log_Info": 5.40018081665039e-06,
+    "Time_Process_Batch": 0.00013536612192789713,
+    "Time_Train_Batch": 0.0011204322179158529
+}
+
+Epoch 21 Memory Usage: 1572 MB
+
+100%|##########| 100/100 [00:04<00:00, 24.37it/s]
+Train Epoch 22
+{
+    "Log_Likelihood": 62.684652214050296,
+    "Loss": -62.684652214050296,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 2958330.615674891,
+    "Time_Data_Loading": 0.006337213516235352,
+    "Time_Epoch": 0.06896900335947673,
+    "Time_Log_Info": 0.012280317147572835,
+    "Time_Process_Batch": 0.001376513640085856,
+    "Time_Train_Batch": 0.044457316398620605
+}
+100%|##########| 10/10 [00:00<00:00, 57.94it/s]
+Validation Epoch 22
+{
+    "Log_Likelihood": 60.87150077819824,
+    "Loss": -60.87150077819824,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0015284260114034017,
+    "Time_Epoch": 0.0032729228337605794,
+    "Time_Log_Info": 5.547205607096354e-06,
+    "Time_Process_Batch": 0.0001402139663696289,
+    "Time_Train_Batch": 0.001191254456837972
+}
+
+Epoch 22 Memory Usage: 1572 MB
+
+100%|##########| 100/100 [00:03<00:00, 25.51it/s]
+Train Epoch 23
+{
+    "Log_Likelihood": 62.48294887542725,
+    "Loss": -62.48294887542725,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 2840902.177846581,
+    "Time_Data_Loading": 0.005776806672414144,
+    "Time_Epoch": 0.06592710812886556,
+    "Time_Log_Info": 0.012193767229715984,
+    "Time_Process_Batch": 0.0012159347534179688,
+    "Time_Train_Batch": 0.04277296861012777
+}
+100%|##########| 10/10 [00:00<00:00, 71.05it/s]
+Validation Epoch 23
+{
+    "Log_Likelihood": 61.56392402648926,
+    "Loss": -61.56392402648926,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0010561863581339517,
+    "Time_Epoch": 0.002727770805358887,
+    "Time_Log_Info": 4.76837158203125e-06,
+    "Time_Process_Batch": 0.00012696584065755208,
+    "Time_Train_Batch": 0.0011474927266438802
+}
+
+Epoch 23 Memory Usage: 1572 MB
+
+100%|##########| 100/100 [00:03<00:00, 25.28it/s]
+Train Epoch 24
+{
+    "Log_Likelihood": 61.060090408325195,
+    "Loss": -61.060090408325195,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 4189827.774270634,
+    "Time_Data_Loading": 0.005886356035868327,
+    "Time_Epoch": 0.06646921237309773,
+    "Time_Log_Info": 0.01223584810892741,
+    "Time_Process_Batch": 0.0011901378631591797,
+    "Time_Train_Batch": 0.04319108724594116
+}
+100%|##########| 10/10 [00:00<00:00, 71.39it/s]
+Validation Epoch 24
+{
+    "Log_Likelihood": 61.025204467773435,
+    "Loss": -61.025204467773435,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.001057132085164388,
+    "Time_Epoch": 0.002647705872853597,
+    "Time_Log_Info": 8.575121561686198e-06,
+    "Time_Process_Batch": 0.0001359105110168457,
+    "Time_Train_Batch": 0.0011219382286071777
+}
+
+Epoch 24 Memory Usage: 1572 MB
+
+100%|##########| 100/100 [00:03<00:00, 25.12it/s]
+Train Epoch 25
+{
+    "Log_Likelihood": 63.113204383850096,
+    "Loss": -63.113204383850096,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 2342303.5147042363,
+    "Time_Data_Loading": 0.005900939305623372,
+    "Time_Epoch": 0.06694790124893188,
+    "Time_Log_Info": 0.012259491284688314,
+    "Time_Process_Batch": 0.0012271920839945474,
+    "Time_Train_Batch": 0.0432962973912557
+}
+100%|##########| 10/10 [00:00<00:00, 76.22it/s]
+Validation Epoch 25
+{
+    "Log_Likelihood": 62.932007217407225,
+    "Loss": -62.932007217407225,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.00097655455271403,
+    "Time_Epoch": 0.002537401517232259,
+    "Time_Log_Info": 4.76837158203125e-06,
+    "Time_Process_Batch": 0.00010419686635335287,
+    "Time_Train_Batch": 0.0010895133018493652
+}
+save checkpoint to /home/yujp/MimicPlay/mimicplay/../trained_models_highlevel/test/20260118175602/models/model_epoch_25_best_validation_-62.932007217407225.pth
+
+Epoch 25 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:04<00:00, 24.45it/s]
+Train Epoch 26
+{
+    "Log_Likelihood": 62.87514186859131,
+    "Loss": -62.87514186859131,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 2822833.122454478,
+    "Time_Data_Loading": 0.006268882751464843,
+    "Time_Epoch": 0.0686986804008484,
+    "Time_Log_Info": 0.01208932399749756,
+    "Time_Process_Batch": 0.0013671875,
+    "Time_Train_Batch": 0.044490198294321694
+}
+100%|##########| 10/10 [00:00<00:00, 69.87it/s]
+Validation Epoch 26
+{
+    "Log_Likelihood": 58.4943302154541,
+    "Loss": -58.4943302154541,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0011414488156636555,
+    "Time_Epoch": 0.0026843508084615072,
+    "Time_Log_Info": 5.718072255452474e-06,
+    "Time_Process_Batch": 0.00013865232467651366,
+    "Time_Train_Batch": 0.0010868112246195476
+}
+
+Epoch 26 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:03<00:00, 25.16it/s]
+Train Epoch 27
+{
+    "Log_Likelihood": 63.404843673706054,
+    "Loss": -63.404843673706054,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 2530933.0745421946,
+    "Time_Data_Loading": 0.0061980565388997395,
+    "Time_Epoch": 0.06683729887008667,
+    "Time_Log_Info": 0.012252986431121826,
+    "Time_Process_Batch": 0.0012259443600972494,
+    "Time_Train_Batch": 0.04313663641611735
+}
+100%|##########| 10/10 [00:00<00:00, 67.19it/s]
+Validation Epoch 27
+{
+    "Log_Likelihood": 23.749629020690918,
+    "Loss": -23.749629020690918,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0012838006019592284,
+    "Time_Epoch": 0.0028100053469340006,
+    "Time_Log_Info": 4.144509633382161e-06,
+    "Time_Process_Batch": 0.00010718901952107747,
+    "Time_Train_Batch": 0.0010733366012573241
+}
+
+Epoch 27 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:03<00:00, 25.63it/s]
+Train Epoch 28
+{
+    "Log_Likelihood": 63.122554321289066,
+    "Loss": -63.122554321289066,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 3082060.933682026,
+    "Time_Data_Loading": 0.005956697463989258,
+    "Time_Epoch": 0.06560619672139485,
+    "Time_Log_Info": 0.011524554093678792,
+    "Time_Process_Batch": 0.001203930377960205,
+    "Time_Train_Batch": 0.04252460797627767
+}
+100%|##########| 10/10 [00:00<00:00, 72.04it/s]
+Validation Epoch 28
+{
+    "Log_Likelihood": 62.43072624206543,
+    "Loss": -62.43072624206543,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.00107421875,
+    "Time_Epoch": 0.0026484529177347818,
+    "Time_Log_Info": 1.771847407023112e-05,
+    "Time_Process_Batch": 0.00011977354685465495,
+    "Time_Train_Batch": 0.0010926485061645507
+}
+
+Epoch 28 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:03<00:00, 25.69it/s]
+Train Epoch 29
+{
+    "Log_Likelihood": 63.80881843566895,
+    "Loss": -63.80881843566895,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 2567023.708947125,
+    "Time_Data_Loading": 0.005829922358194987,
+    "Time_Epoch": 0.06540825764338175,
+    "Time_Log_Info": 0.012872838973999023,
+    "Time_Process_Batch": 0.0011701583862304688,
+    "Time_Train_Batch": 0.041261331240336103
+}
+100%|##########| 10/10 [00:00<00:00, 71.31it/s]
+Validation Epoch 29
+{
+    "Log_Likelihood": 62.57652359008789,
+    "Loss": -62.57652359008789,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0010924776395161947,
+    "Time_Epoch": 0.0026793599128723143,
+    "Time_Log_Info": 4.450480143229167e-06,
+    "Time_Process_Batch": 0.00010903278986612956,
+    "Time_Train_Batch": 0.001119232177734375
+}
+
+Epoch 29 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:03<00:00, 26.12it/s]
+Train Epoch 30
+{
+    "Log_Likelihood": 64.10428646087647,
+    "Loss": -64.10428646087647,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 2730552.151174866,
+    "Time_Data_Loading": 0.005841259161631266,
+    "Time_Epoch": 0.06440684398015341,
+    "Time_Log_Info": 0.012028062343597412,
+    "Time_Process_Batch": 0.0010975996653238933,
+    "Time_Train_Batch": 0.04132829904556275
+}
+100%|##########| 10/10 [00:00<00:00, 78.26it/s]
+Validation Epoch 30
+{
+    "Log_Likelihood": 61.7422550201416,
+    "Loss": -61.7422550201416,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0009736220041910807,
+    "Time_Epoch": 0.0024889349937438966,
+    "Time_Log_Info": 4.502137502034505e-06,
+    "Time_Process_Batch": 0.00011236270268758139,
+    "Time_Train_Batch": 0.0010292927424112956
+}
+
+Epoch 30 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:03<00:00, 27.82it/s]
+Train Epoch 31
+{
+    "Log_Likelihood": 64.06826560974122,
+    "Loss": -64.06826560974122,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 3287535.819810685,
+    "Time_Data_Loading": 0.005376601219177246,
+    "Time_Epoch": 0.06041796207427978,
+    "Time_Log_Info": 0.011463093757629394,
+    "Time_Process_Batch": 0.0010290781656901041,
+    "Time_Train_Batch": 0.03865931431452433
+}
+100%|##########| 10/10 [00:00<00:00, 67.15it/s]
+Validation Epoch 31
+{
+    "Log_Likelihood": 25.841150283813477,
+    "Loss": -25.841150283813477,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0013388435045878092,
+    "Time_Epoch": 0.0028032541275024416,
+    "Time_Log_Info": 3.941853841145834e-06,
+    "Time_Process_Batch": 0.00010486443837483724,
+    "Time_Train_Batch": 0.0010216355323791504
+}
+
+Epoch 31 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:03<00:00, 26.42it/s]
+Train Epoch 32
+{
+    "Log_Likelihood": 64.70857597351075,
+    "Loss": -64.70857597351075,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 3213894.601980143,
+    "Time_Data_Loading": 0.00572743018468221,
+    "Time_Epoch": 0.0636179804801941,
+    "Time_Log_Info": 0.011580777168273926,
+    "Time_Process_Batch": 0.0011922558148701986,
+    "Time_Train_Batch": 0.04136348962783813
+}
+100%|##########| 10/10 [00:00<00:00, 72.91it/s]
+Validation Epoch 32
+{
+    "Log_Likelihood": 56.25326042175293,
+    "Loss": -56.25326042175293,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0010599811871846517,
+    "Time_Epoch": 0.002657155195871989,
+    "Time_Log_Info": 4.374980926513672e-06,
+    "Time_Process_Batch": 0.0001262823740641276,
+    "Time_Train_Batch": 0.0010810017585754395
+}
+
+Epoch 32 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:03<00:00, 27.40it/s]
+Train Epoch 33
+{
+    "Log_Likelihood": 64.83822570800781,
+    "Loss": -64.83822570800781,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 3814891.955324627,
+    "Time_Data_Loading": 0.005650238196055094,
+    "Time_Epoch": 0.06137975056966146,
+    "Time_Log_Info": 0.011374231179555256,
+    "Time_Process_Batch": 0.001125041643778483,
+    "Time_Train_Batch": 0.03942054510116577
+}
+100%|##########| 10/10 [00:00<00:00, 69.43it/s]
+Validation Epoch 33
+{
+    "Log_Likelihood": 46.977914047241214,
+    "Loss": -46.977914047241214,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0012106776237487793,
+    "Time_Epoch": 0.002807803948720296,
+    "Time_Log_Info": 4.506111145019531e-06,
+    "Time_Process_Batch": 0.00012143850326538086,
+    "Time_Train_Batch": 0.0010523200035095215
+}
+
+Epoch 33 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:03<00:00, 26.84it/s]
+Train Epoch 34
+{
+    "Log_Likelihood": 65.15075668334961,
+    "Loss": -65.15075668334961,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 3745904.6032154504,
+    "Time_Data_Loading": 0.0057477156321207685,
+    "Time_Epoch": 0.06276162465413411,
+    "Time_Log_Info": 0.011856643358866374,
+    "Time_Process_Batch": 0.0011137763659159342,
+    "Time_Train_Batch": 0.04024043083190918
+}
+100%|##########| 10/10 [00:00<00:00, 72.59it/s]
+Validation Epoch 34
+{
+    "Log_Likelihood": 57.624739456176755,
+    "Loss": -57.624739456176755,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0010921994845072428,
+    "Time_Epoch": 0.0026014526685078938,
+    "Time_Log_Info": 4.351139068603516e-06,
+    "Time_Process_Batch": 0.00011998812357584635,
+    "Time_Train_Batch": 0.0010674516359965005
+}
+
+Epoch 34 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:03<00:00, 26.33it/s]
+Train Epoch 35
+{
+    "Log_Likelihood": 66.20337574005127,
+    "Loss": -66.20337574005127,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 3948869.5972024025,
+    "Time_Data_Loading": 0.005834452311197917,
+    "Time_Epoch": 0.06387057304382324,
+    "Time_Log_Info": 0.012186161677042643,
+    "Time_Process_Batch": 0.0011227687199910482,
+    "Time_Train_Batch": 0.04076870679855347
+}
+100%|##########| 10/10 [00:00<00:00, 71.44it/s]
+Validation Epoch 35
+{
+    "Log_Likelihood": 63.25312881469726,
+    "Loss": -63.25312881469726,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0011813640594482422,
+    "Time_Epoch": 0.0026506463686625163,
+    "Time_Log_Info": 8.531411488850911e-06,
+    "Time_Process_Batch": 0.00010512272516886394,
+    "Time_Train_Batch": 0.00102691650390625
+}
+save checkpoint to /home/yujp/MimicPlay/mimicplay/../trained_models_highlevel/test/20260118175602/models/model_epoch_35_best_validation_-63.25312881469726.pth
+
+Epoch 35 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:04<00:00, 24.20it/s]
+Train Epoch 36
+{
+    "Log_Likelihood": 66.78617458343506,
+    "Loss": -66.78617458343506,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 3480977.26961542,
+    "Time_Data_Loading": 0.00613174835840861,
+    "Time_Epoch": 0.06945469776789347,
+    "Time_Log_Info": 0.012196564674377441,
+    "Time_Process_Batch": 0.0012791196505228678,
+    "Time_Train_Batch": 0.045322851339975996
+}
+100%|##########| 10/10 [00:00<00:00, 55.96it/s]
+Validation Epoch 36
+{
+    "Log_Likelihood": 65.44673385620118,
+    "Loss": -65.44673385620118,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.001683497428894043,
+    "Time_Epoch": 0.0033893823623657227,
+    "Time_Log_Info": 1.4106432596842447e-05,
+    "Time_Process_Batch": 0.00014084577560424805,
+    "Time_Train_Batch": 0.0011259873708089193
+}
+save checkpoint to /home/yujp/MimicPlay/mimicplay/../trained_models_highlevel/test/20260118175602/models/model_epoch_36_best_validation_-65.44673385620118.pth
+
+Epoch 36 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:03<00:00, 26.58it/s]
+Train Epoch 37
+{
+    "Log_Likelihood": 67.44007648468018,
+    "Loss": -67.44007648468018,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 4482524.039737402,
+    "Time_Data_Loading": 0.00582511027654012,
+    "Time_Epoch": 0.06323962608973185,
+    "Time_Log_Info": 0.011400115489959717,
+    "Time_Process_Batch": 0.00105819304784139,
+    "Time_Train_Batch": 0.04125990867614746
+}
+100%|##########| 10/10 [00:00<00:00, 70.47it/s]
+Validation Epoch 37
+{
+    "Log_Likelihood": 61.03613014221192,
+    "Loss": -61.03613014221192,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0012557864189147948,
+    "Time_Epoch": 0.002661128838857015,
+    "Time_Log_Info": 7.025400797526041e-06,
+    "Time_Process_Batch": 0.00010466575622558594,
+    "Time_Train_Batch": 0.0009881297747294107
+}
+
+Epoch 37 Memory Usage: 1582 MB
+
+100%|##########| 100/100 [00:03<00:00, 25.69it/s]
+Train Epoch 38
+{
+    "Log_Likelihood": 67.09705890655518,
+    "Loss": -67.09705890655518,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 4726454.441575793,
+    "Time_Data_Loading": 0.006046851476033528,
+    "Time_Epoch": 0.06537634134292603,
+    "Time_Log_Info": 0.01182949145634969,
+    "Time_Process_Batch": 0.0012427449226379394,
+    "Time_Train_Batch": 0.04210180441538493
+}
+100%|##########| 10/10 [00:00<00:00, 73.08it/s]
+Validation Epoch 38
+{
+    "Log_Likelihood": 67.68805084228515,
+    "Loss": -67.68805084228515,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0011614918708801269,
+    "Time_Epoch": 0.0026010513305664063,
+    "Time_Log_Info": 4.279613494873047e-06,
+    "Time_Process_Batch": 9.453296661376953e-05,
+    "Time_Train_Batch": 0.0010089556376139323
+}
+save checkpoint to /home/yujp/MimicPlay/mimicplay/../trained_models_highlevel/test/20260118175602/models/model_epoch_38_best_validation_-67.68805084228515.pth
+
+Epoch 38 Memory Usage: 1586 MB
+
+100%|##########| 100/100 [00:03<00:00, 26.69it/s]
+Train Epoch 39
+{
+    "Log_Likelihood": 66.73507476806641,
+    "Loss": -66.73507476806641,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 5166235.451415631,
+    "Time_Data_Loading": 0.0056069691975911455,
+    "Time_Epoch": 0.0629708210627238,
+    "Time_Log_Info": 0.011996038754781087,
+    "Time_Process_Batch": 0.0010886073112487793,
+    "Time_Train_Batch": 0.040407979488372804
+}
+100%|##########| 10/10 [00:00<00:00, 71.57it/s]
+Validation Epoch 39
+{
+    "Log_Likelihood": 67.1239128112793,
+    "Loss": -67.1239128112793,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0010903120040893556,
+    "Time_Epoch": 0.0026920557022094725,
+    "Time_Log_Info": 5.356470743815104e-06,
+    "Time_Process_Batch": 0.00011303822199503581,
+    "Time_Train_Batch": 0.0011085073153177898
+}
+
+Epoch 39 Memory Usage: 1586 MB
+
+100%|##########| 100/100 [00:03<00:00, 26.73it/s]
+Train Epoch 40
+{
+    "Log_Likelihood": 68.01519477844238,
+    "Loss": -68.01519477844238,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 4601056.959688316,
+    "Time_Data_Loading": 0.005482312043507894,
+    "Time_Epoch": 0.06295990149180095,
+    "Time_Log_Info": 0.01152788003285726,
+    "Time_Process_Batch": 0.0010663072268168132,
+    "Time_Train_Batch": 0.04106507698694865
+}
+100%|##########| 10/10 [00:00<00:00, 71.00it/s]
+Validation Epoch 40
+{
+    "Log_Likelihood": -19.2531849861145,
+    "Loss": 19.2531849861145,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0011014143625895183,
+    "Time_Epoch": 0.0026532888412475588,
+    "Time_Log_Info": 4.382928212483724e-06,
+    "Time_Process_Batch": 0.00010810295740763347,
+    "Time_Train_Batch": 0.0011237621307373046
+}
+
+Epoch 40 Memory Usage: 1572 MB
+
+100%|##########| 100/100 [00:03<00:00, 27.04it/s]
+Train Epoch 41
+{
+    "Log_Likelihood": 68.59297187805176,
+    "Loss": -68.59297187805176,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 4407341.488945245,
+    "Time_Data_Loading": 0.005765219529469808,
+    "Time_Epoch": 0.06226174831390381,
+    "Time_Log_Info": 0.011529874801635743,
+    "Time_Process_Batch": 0.0010736902554829915,
+    "Time_Train_Batch": 0.039977399508158366
+}
+100%|##########| 10/10 [00:00<00:00, 67.62it/s]
+Validation Epoch 41
+{
+    "Log_Likelihood": 67.80328369140625,
+    "Loss": -67.80328369140625,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0013496518135070802,
+    "Time_Epoch": 0.0028004010518391928,
+    "Time_Log_Info": 6.492932637532552e-06,
+    "Time_Process_Batch": 9.887615839640299e-05,
+    "Time_Train_Batch": 0.0009984056154886882
+}
+save checkpoint to /home/yujp/MimicPlay/mimicplay/../trained_models_highlevel/test/20260118175602/models/model_epoch_41_best_validation_-67.80328369140625.pth
+
+Epoch 41 Memory Usage: 1590 MB
+
+100%|##########| 100/100 [00:03<00:00, 27.85it/s]
+Train Epoch 42
+{
+    "Log_Likelihood": 69.65242961883546,
+    "Loss": -69.65242961883546,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 4851556.999861399,
+    "Time_Data_Loading": 0.005404992898305257,
+    "Time_Epoch": 0.06039440631866455,
+    "Time_Log_Info": 0.011641446749369304,
+    "Time_Process_Batch": 0.0010141571362813314,
+    "Time_Train_Batch": 0.03847865263621012
+}
+100%|##########| 10/10 [00:00<00:00, 71.65it/s]
+Validation Epoch 42
+{
+    "Log_Likelihood": 36.53454170227051,
+    "Loss": -36.53454170227051,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.001149145762125651,
+    "Time_Epoch": 0.0026502450307210284,
+    "Time_Log_Info": 4.9710273742675785e-06,
+    "Time_Process_Batch": 0.00011268059412638347,
+    "Time_Train_Batch": 0.00104599396387736
+}
+
+Epoch 42 Memory Usage: 1590 MB
+
+100%|##########| 100/100 [00:03<00:00, 27.72it/s]
+Train Epoch 43
+{
+    "Log_Likelihood": 69.67358730316163,
+    "Loss": -69.67358730316163,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 5355921.323674189,
+    "Time_Data_Loading": 0.005539365609486898,
+    "Time_Epoch": 0.06069426536560059,
+    "Time_Log_Info": 0.01151201327641805,
+    "Time_Process_Batch": 0.0009732802708943684,
+    "Time_Train_Batch": 0.038889805475870766
+}
+100%|##########| 10/10 [00:00<00:00, 70.93it/s]
+Validation Epoch 43
+{
+    "Log_Likelihood": 39.549007415771484,
+    "Loss": -39.549007415771484,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.0012401064236958821,
+    "Time_Epoch": 0.002673792839050293,
+    "Time_Log_Info": 4.009405771891276e-06,
+    "Time_Process_Batch": 9.846687316894531e-05,
+    "Time_Train_Batch": 0.000998842716217041
+}
+
+Epoch 43 Memory Usage: 1572 MB
+
+100%|##########| 100/100 [00:03<00:00, 27.67it/s]
+Train Epoch 44
+{
+    "Log_Likelihood": 69.41810821533203,
+    "Loss": -69.41810821533203,
+    "Optimizer/policy0_lr": 0.0001,
+    "Policy_Grad_Norms": 5378132.532654422,
+    "Time_Data_Loading": 0.005434211095174154,
+    "Time_Epoch": 0.06074202060699463,
+    "Time_Log_Info": 0.011421767870585124,
+    "Time_Process_Batch": 0.0010521451632181803,
+    "Time_Train_Batch": 0.03914943933486938
+}
+100%|##########| 10/10 [00:00<00:00, 72.21it/s]
+Validation Epoch 44
+{
+    "Log_Likelihood": 35.49990539550781,
+    "Loss": -35.49990539550781,
+    "Optimizer/policy0_lr": 0.0001,
+    "Time_Data_Loading": 0.001179945468902588,
+    "Time_Epoch": 0.0026267369588216147,
+    "Time_Log_Info": 8.650620778401692e-06,
+    "Time_Process_Batch": 0.0001018524169921875,
+    "Time_Train_Batch": 0.0010054270426432292
+}
+
+Epoch 44 Memory Usage: 1572 MB
+
+ 23%|##3       | 23/100 [00:00<00:02, 29.30it/s]
