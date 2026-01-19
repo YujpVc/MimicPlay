@@ -220,7 +220,7 @@ def visualize_hdf5(hdf5_path, demo_index=None, fps=20):
 def main():
     parser = argparse.ArgumentParser(description="2D Curve Visualization for Fairino Data (using Rerun)")
     parser.add_argument("hdf5_path", type=str, nargs='?',
-                       default="/home/yujp/MimicPlay/data_collect/demos/demo_20260116_222950/demos.hdf5",
+                       default="/home/yujp/MimicPlay/data_collect/demos/demo_20260119_180854/demos.hdf5",
                        help="Path to .hdf5 file")
     parser.add_argument("--demo_idx", type=int, default=None,
                        help="Specific demo to visualize (default: all)")

@@ -2,7 +2,7 @@
 
 # 定义基础路径变量（请修改为实际路径）
 BASE_PATH="/home/yujp/Genesis/scripts/XBOX_control/dataCollect/demo/demo_multitask_cube"
-INPUT_FILE="${BASE_PATH}/demos.hdf5"
+INPUT_FILE="${BASE_PATH}/merged.hdf5"
 MODIFIED_FILE="${BASE_PATH}/demos_modified.hdf5"
 OUTPUT_FILE="${BASE_PATH}/image_demo_local.hdf5"
 VIDEO_PATH_HAND="${BASE_PATH}/hand_image_demo_local_replay.mp4"
@@ -46,5 +46,6 @@ python scripts/playback_robomimic_dataset.py \
     --use-obs \
     --render_image_names agentview_image \
     --video_path "$VIDEO_PATH_AGENT" \
+    --n 1
 
 echo "所有处理步骤已完成！"

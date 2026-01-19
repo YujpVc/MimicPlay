@@ -1,11 +1,13 @@
 {
     "algo_name": "mimicplay",
     "experiment": {
-        "name": "test",
+        "name": "lowlevel_0120_optimized",
         "validate": true,
         "logging": {
             "terminal_output_to_txt": true,
-            "log_tb": true
+            "log_tb": true,
+            "log_wandb": true,
+            "wandb_proj_name": "mimicplay_lowlevel_0120"
         },
         "save": {
             "enabled": true,
@@ -25,25 +27,25 @@
         "keep_all_videos": false,
         "video_skip": 5,
         "rollout": {
-            "enabled": true,
+            "enabled": false,
             "n": 10,
             "horizon": 1600,
-            "rate": 20,
+            "rate": 50,
             "warmstart": 0,
             "terminate_on_success": true
         }
     },
     "train": {
-        "data": null,
+        "data": "/home/yujp/Genesis/scripts/XBOX_control/dataCollect/demo/demo_multitask_cube/image_demo_local.hdf5",
         "output_dir": "../trained_models_lowlevel",
-        "num_data_workers": 32,
+        "num_data_workers": 2,
         "hdf5_cache_mode": "low_dim",
         "hdf5_use_swmr": true,
         "hdf5_normalize_obs": false,
         "hdf5_load_next_obs": false,
         "hdf5_filter_key": "train",
         "hdf5_validation_filter_key": "valid",
-        "seq_length": 10,
+        "seq_length": 13,
         "dataset_keys": [
             "actions",
             "rewards",
@@ -51,7 +53,7 @@
         ],
         "goal_mode": "nstep",
         "cuda": true,
-        "batch_size": 64,
+        "batch_size": 32,
         "num_epochs": 3000,
         "seed": 1
     },
@@ -59,12 +61,12 @@
         "optim_params": {
             "policy": {
                 "learning_rate": {
-                    "initial": 0.00005,
+                    "initial": 3e-05,
                     "decay_factor": 0.1,
                     "epoch_schedule": []
                 },
                 "regularization": {
-                    "L2": 0.0
+                    "L2": 1e-4
                 }
             }
         },
@@ -88,7 +90,7 @@
         "gmm": {
             "enabled": true,
             "num_modes": 5,
-            "min_std": 0.0001,
+            "min_std": 0.001,
             "std_activation": "softplus",
             "low_noise_eval": false
         },
@@ -148,21 +150,21 @@
             "feat_dim": 656,
             "n_layer": 4,
             "n_head": 4,
-            "block_size": 10,
+            "block_size": 13,
             "gmm_modes": 5,
             "action_dim": 7,
             "proprio_dim": 7,
             "spatial_softmax_num_kp": 64,
-            "gmm_min_std": 0.0001,
-            "dropout": 0.1,
-            "trained_highlevel_planner": "/home/yujp/Genesis/scripts/XBOX_control/dataCollect/demo/demo_study/highlevel_no_norm_no_tanh/test/20251201232024/models/model_epoch_112_best_validation_-54.86464233398438.pth",
-            "eval_goal_img_window": 30,
-            "eval_max_goal_img_iter": 5
+            "gmm_min_std": 0.001,
+            "dropout": 0.2,
+            "trained_highlevel_planner": "/home/yujp/MimicPlay/trained_models_highlevel/highlevel_model_epoch_357_best_validation_-65.05948219299316.pth",
+            "eval_goal_img_window": 6,
+            "eval_max_goal_img_iter": 25
         },
         "playdata": {
             "enabled": true,
-            "goal_image_range": [100, 200],
-            "eval_goal_gap": 150
+            "goal_image_range": [20, 40],
+            "eval_goal_gap": 30
         }
     },
     "observation": {

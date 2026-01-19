@@ -1,14 +1,8 @@
 #!/bin/bash
 
 # Real Robot Data Processing Script for MimicPlay
-# Usage: ./data_process_real.sh /path/to/demos.hdf5
-
-if [ "$#" -ne 1 ]; then
-    echo "Usage: $0 /path/to/demos.hdf5"
-    exit 1
-fi
-
-INPUT_FILE="$1"
+# Usage: ./data_process_real.sh
+INPUT_FILE="/home/yujp/MimicPlay/data_collect/demos/demo_20260117_210731/demos.hdf5"
 # Get directory of input file
 BASE_DIR=$(dirname "$INPUT_FILE")
 # Create output filename
@@ -23,8 +17,12 @@ python mimicplay/scripts/preprocess_hdf5.py -i "$INPUT_FILE" -o "$OUTPUT_FILE"
 
 # 2. Extract Trajectory Plans (Future Trajectory for High-level Policy)
 # This adds 'robot0_eef_pos_future_traj' to the HDF5
-echo "[2/2] Extracting Future Trajectories..."
+echo "[2/3] Extracting Future Trajectories..."
 python mimicplay/scripts/dataset_extract_traj_plans.py --dataset "$OUTPUT_FILE"
+
+# 3. Create Train/Validation Split (Add mask/train and mask/valid)
+echo "[3/3] Creating Train/Validation Split..."
+python /home/yujp/MimicPlay/mimicplay/scripts/split_train_val.py --dataset "$OUTPUT_FILE" --ratio 0.1
 
 echo "----------------------------------------------------------------"
 echo "Processing Complete!"
