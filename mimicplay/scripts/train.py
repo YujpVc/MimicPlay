@@ -140,7 +140,7 @@ def train(config, device):
         wandb.init(
             project=config.experiment.logging.wandb_proj_name,
             name=config.experiment.name,
-            config=config,
+            config=config.to_dict(),
             id=config.experiment.logging.wandb_run_id if 'wandb_run_id' in config.experiment.logging else None,
             resume="allow"
         )
