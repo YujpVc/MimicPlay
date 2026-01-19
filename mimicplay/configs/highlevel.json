@@ -5,7 +5,9 @@
         "validate": true,
         "logging": {
             "terminal_output_to_txt": true,
-            "log_tb": true
+            "log_tb": true,
+            "log_wandb": true,
+            "wandb_proj_name": "mimicplay_highlevel"
         },
         "save": {
             "enabled": true,

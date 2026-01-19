@@ -27,6 +27,7 @@ import os
 import psutil
 import sys
 import traceback
+import wandb
 
 from collections import OrderedDict
 
@@ -133,6 +134,17 @@ def train(config, device):
         config,
         log_tb=config.experiment.logging.log_tb,
     )
+
+    # Initialize wandb
+    if config.experiment.logging.log_wandb:
+        wandb.init(
+            project=config.experiment.logging.wandb_proj_name,
+            name=config.experiment.name,
+            config=config,
+            id=config.experiment.logging.wandb_run_id if 'wandb_run_id' in config.experiment.logging else None,
+            resume="allow"
+        )
+
     model = algo_factory(
         algo_name=config.algo_name,
         config=config,
@@ -222,6 +234,8 @@ def train(config, device):
 
         print("Train Epoch {}".format(epoch))
         print(json.dumps(step_log, sort_keys=True, indent=4))
+        if config.experiment.logging.log_wandb:
+            wandb.log({f"Train/{k}": v for k, v in step_log.items()}, step=epoch)
         for k, v in step_log.items():
             if k.startswith("Time_"):
                 data_logger.record("Timing_Stats/Train_{}".format(k[5:]), v, epoch)
@@ -233,6 +247,8 @@ def train(config, device):
             with torch.no_grad():
                 step_log = TrainUtils.run_epoch(model=model, data_loader=valid_loader, epoch=epoch, validate=True,
                                                 num_steps=valid_num_steps)
+            if config.experiment.logging.log_wandb:
+                wandb.log({f"Valid/{k}": v for k, v in step_log.items()}, step=epoch)
             for k, v in step_log.items():
                 if k.startswith("Time_"):
                     data_logger.record("Timing_Stats/Valid_{}".format(k[5:]), v, epoch)
@@ -276,6 +292,14 @@ def train(config, device):
             )
 
             # summarize results from rollouts to tensorboard and terminal
+            if config.experiment.logging.log_wandb:
+                wandb_rollout_log = {}
+                for env_name in all_rollout_logs:
+                    rollout_logs = all_rollout_logs[env_name]
+                    for k, v in rollout_logs.items():
+                         wandb_rollout_log[f"Rollout/{env_name}/{k}"] = v
+                wandb.log(wandb_rollout_log, step=epoch)
+
             for env_name in all_rollout_logs:
                 rollout_logs = all_rollout_logs[env_name]
                 for k, v in rollout_logs.items():
@@ -333,10 +357,14 @@ def train(config, device):
         process = psutil.Process(os.getpid())
         mem_usage = int(process.memory_info().rss / 1000000)
         data_logger.record("System/RAM Usage (MB)", mem_usage, epoch)
+        if config.experiment.logging.log_wandb:
+            wandb.log({"System/RAM Usage (MB)": mem_usage}, step=epoch)
         print("\nEpoch {} Memory Usage: {} MB\n".format(epoch, mem_usage))
 
     # terminate logging
     data_logger.close()
+    if config.experiment.logging.log_wandb:
+        wandb.finish()
 
 
 def main(args):
