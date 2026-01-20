@@ -6,8 +6,6 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 sys.path.append(PROJECT_ROOT)
 
-from realrobot.env import Robot
-
 import rospy
 from geometry_msgs.msg import PoseStamped
 from scipy.spatial.transform import Rotation as R
@@ -15,6 +13,11 @@ from scipy.spatial.transform import Rotation as R
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Publish robot TCP pose as PoseStamped.")
+    parser.add_argument(
+        "--realrobot-root",
+        default="/home/yujp/diffusion_policy_XWD",
+        help="Path that contains the realrobot module.",
+    )
     parser.add_argument("--robot-ip", default="192.168.58.6", help="FR5 robot IP address.")
     parser.add_argument("--topic", default="robot_pose", help="ROS topic to publish.")
     parser.add_argument("--frame-id", default="base_link", help="Pose frame id.")
@@ -24,6 +27,17 @@ def parse_args():
 
 def main():
     args = parse_args()
+
+    if args.realrobot_root:
+        sys.path.insert(0, args.realrobot_root)
+
+    try:
+        from realrobot.env import Robot  # type: ignore[import-not-found]
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "Cannot import realrobot. Provide --realrobot-root with the "
+            "directory that contains the realrobot module."
+        ) from exc
 
     rospy.init_node("robot_pose_publisher", anonymous=True)
     pub = rospy.Publisher(args.topic, PoseStamped, queue_size=10)
