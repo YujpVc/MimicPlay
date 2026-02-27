@@ -1,0 +1,300 @@
+{
+    "algo": {
+        "actor_layer_dims": [
+            400,
+            400
+        ],
+        "gaussian": {
+            "enabled": false,
+            "fixed_std": false,
+            "init_std": 0.1,
+            "low_noise_eval": true,
+            "min_std": 0.01,
+            "std_activation": "softplus"
+        },
+        "gmm": {
+            "enabled": true,
+            "low_noise_eval": false,
+            "min_std": 0.1,
+            "num_modes": 5,
+            "std_activation": "softplus"
+        },
+        "highlevel": {
+            "ac_dim": 30,
+            "enabled": true,
+            "latent_plan_dim": 400
+        },
+        "loss": {
+            "cos_weight": 0,
+            "l1_weight": 0.4,
+            "l2_weight": 1
+        },
+        "lowlevel": {
+            "action_dim": 7,
+            "block_size": 10,
+            "dropout": 0.3,
+            "enabled": true,
+            "eval_goal_img_window": 30,
+            "eval_max_goal_img_iter": 5,
+            "feat_dim": 656,
+            "gmm_min_std": 0.1,
+            "gmm_modes": 5,
+            "n_head": 4,
+            "n_layer": 4,
+            "proprio_dim": 7,
+            "spatial_softmax_num_kp": 64,
+            "trained_highlevel_planner": "/home/yujp/Genesis/scripts/XBOX_control/dataCollect/demo/demo_multitask_cube/highlevel/test/20260121001652/models/model_epoch_528_best_validation_-84.52288436889648.pth"
+        },
+        "optim_params": {
+            "policy": {
+                "learning_rate": {
+                    "decay_factor": 0.1,
+                    "epoch_schedule": [],
+                    "initial": 5e-05
+                },
+                "regularization": {
+                    "L2": 0.0001
+                }
+            }
+        },
+        "playdata": {
+            "enabled": true,
+            "eval_goal_gap": 100,
+            "goal_image_range": [
+                60,
+                140
+            ]
+        },
+        "rnn": {
+            "enabled": true,
+            "hidden_dim": 400,
+            "horizon": 10,
+            "kwargs": {
+                "bidirectional": false
+            },
+            "num_layers": 2,
+            "open_loop": false,
+            "rnn_type": "LSTM"
+        },
+        "vae": {
+            "decoder": {
+                "is_conditioned": true,
+                "reconstruction_sum_across_elements": false
+            },
+            "decoder_layer_dims": [
+                300,
+                400
+            ],
+            "enabled": false,
+            "encoder_layer_dims": [
+                300,
+                400
+            ],
+            "kl_weight": 1,
+            "latent_clip": null,
+            "latent_dim": 14,
+            "prior": {
+                "categorical_dim": 10,
+                "categorical_gumbel_softmax_hard": false,
+                "categorical_init_temp": 1,
+                "categorical_min_temp": 0.3,
+                "categorical_temp_anneal_step": 0.001,
+                "gmm_learn_weights": false,
+                "gmm_num_modes": 10,
+                "is_conditioned": false,
+                "learn": false,
+                "use_categorical": false,
+                "use_gmm": false
+            },
+            "prior_layer_dims": [
+                300,
+                400
+            ]
+        }
+    },
+    "algo_name": "mimicplay",
+    "experiment": {
+        "additional_envs": null,
+        "env": null,
+        "epoch_every_n_steps": 100,
+        "keep_all_videos": false,
+        "logging": {
+            "log_tb": true,
+            "log_wandb": true,
+            "terminal_output_to_txt": true,
+            "wandb_proj_name": "mimicplay_lowlevel"
+        },
+        "name": "test",
+        "render": false,
+        "render_video": true,
+        "rollout": {
+            "enabled": false,
+            "horizon": 1600,
+            "n": 10,
+            "rate": 50,
+            "terminate_on_success": true,
+            "warmstart": 0
+        },
+        "save": {
+            "enabled": true,
+            "epochs": [],
+            "every_n_epochs": 50,
+            "every_n_seconds": null,
+            "on_best_rollout_return": false,
+            "on_best_rollout_success_rate": true,
+            "on_best_validation": true
+        },
+        "validate": true,
+        "validation_epoch_every_n_steps": 10,
+        "video_skip": 5
+    },
+    "observation": {
+        "encoder": {
+            "depth": {
+                "core_class": "VisualCore",
+                "core_kwargs": {
+                    "backbone_class": "ResNet18Conv",
+                    "backbone_kwargs": {
+                        "input_coord_conv": false,
+                        "pretrained": false
+                    },
+                    "feature_dimension": 64,
+                    "flatten": true,
+                    "pool_class": "SpatialSoftmax",
+                    "pool_kwargs": {
+                        "learnable_temperature": false,
+                        "noise_std": 0,
+                        "num_kp": 32,
+                        "output_variance": false,
+                        "temperature": 1
+                    }
+                },
+                "obs_randomizer_class": null,
+                "obs_randomizer_kwargs": {
+                    "crop_height": 76,
+                    "crop_width": 76,
+                    "num_crops": 1,
+                    "pos_enc": false
+                }
+            },
+            "low_dim": {
+                "core_class": null,
+                "core_kwargs": {},
+                "obs_randomizer_class": null,
+                "obs_randomizer_kwargs": {}
+            },
+            "rgb": {
+                "core_class": "VisualCore",
+                "core_kwargs": {
+                    "backbone_class": "ResNet18Conv",
+                    "backbone_kwargs": {
+                        "input_coord_conv": false,
+                        "pretrained": false
+                    },
+                    "feature_dimension": 64,
+                    "flatten": true,
+                    "pool_class": "SpatialSoftmax",
+                    "pool_kwargs": {
+                        "learnable_temperature": false,
+                        "noise_std": 0,
+                        "num_kp": 32,
+                        "output_variance": false,
+                        "temperature": 1
+                    }
+                },
+                "obs_randomizer_class": "CropRandomizer",
+                "obs_randomizer_kwargs": {
+                    "crop_height": 76,
+                    "crop_width": 76,
+                    "num_crops": 1,
+                    "pos_enc": false
+                }
+            },
+            "scan": {
+                "core_class": "ScanCore",
+                "core_kwargs": {
+                    "conv_activation": "relu",
+                    "conv_kwargs": {
+                        "kernel_size": [
+                            8,
+                            4,
+                            2
+                        ],
+                        "out_channels": [
+                            32,
+                            64,
+                            64
+                        ],
+                        "stride": [
+                            4,
+                            2,
+                            1
+                        ]
+                    },
+                    "feature_dimension": 64,
+                    "flatten": true,
+                    "pool_class": "SpatialSoftmax",
+                    "pool_kwargs": {
+                        "learnable_temperature": false,
+                        "noise_std": 0,
+                        "num_kp": 32,
+                        "output_variance": false,
+                        "temperature": 1
+                    }
+                },
+                "obs_randomizer_class": null,
+                "obs_randomizer_kwargs": {
+                    "crop_height": 76,
+                    "crop_width": 76,
+                    "num_crops": 1,
+                    "pos_enc": false
+                }
+            }
+        },
+        "modalities": {
+            "goal": {
+                "depth": [],
+                "low_dim": [],
+                "rgb": [
+                    "agentview_image"
+                ],
+                "scan": []
+            },
+            "obs": {
+                "depth": [],
+                "low_dim": [
+                    "robot0_eef_pos",
+                    "robot0_eef_quat",
+                    "robot0_gripper_qpos"
+                ],
+                "rgb": [
+                    "agentview_image",
+                    "robot0_eye_in_hand_image"
+                ],
+                "scan": []
+            }
+        }
+    },
+    "train": {
+        "batch_size": 64,
+        "cuda": true,
+        "data": "/home/yujp/Genesis/scripts/XBOX_control/dataCollect/demo/demo_multitask_cube/image_demo_local.hdf5",
+        "dataset_keys": [
+            "actions",
+            "rewards",
+            "dones"
+        ],
+        "goal_mode": "nstep",
+        "hdf5_cache_mode": "low_dim",
+        "hdf5_filter_key": "train",
+        "hdf5_load_next_obs": false,
+        "hdf5_normalize_obs": false,
+        "hdf5_use_swmr": true,
+        "hdf5_validation_filter_key": "valid",
+        "num_data_workers": 2,
+        "num_epochs": 3000,
+        "output_dir": "../trained_models_lowlevel",
+        "seed": 1,
+        "seq_length": 10
+    }
+}

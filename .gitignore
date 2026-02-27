@@ -41,3 +41,7 @@ training_result/
 
 # Temporary/Debug Files
 debug_summary.md
+
+# Weights & Biases logs and artifacts
+mimicplay/wandb/
+wandb/

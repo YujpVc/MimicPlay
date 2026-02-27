@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # 定义基础路径变量（请修改为实际路径）
-BASE_PATH="/home/yujp/Genesis/scripts/XBOX_control/dataCollect/demo/demo_multitask_cube"
-INPUT_FILE="${BASE_PATH}/merged.hdf5"
+BASE_PATH="/home/yujp/Genesis/scripts/XBOX_control/dataCollect/demo/auto_demo20260227223250"
+INPUT_FILE="${BASE_PATH}/demos.hdf5"
 MODIFIED_FILE="${BASE_PATH}/demos_modified.hdf5"
 OUTPUT_FILE="${BASE_PATH}/image_demo_local.hdf5"
 VIDEO_PATH_HAND="${BASE_PATH}/hand_image_demo_local_replay.mp4"
@@ -37,15 +37,13 @@ python scripts/playback_robomimic_dataset.py \
     --dataset "$OUTPUT_FILE" \
     --use-action \
     --render_image_names robot0_eye_in_hand_image \
-    --video_path "$VIDEO_PATH_HAND" \
-    --n 1 
+    --video_path "$VIDEO_PATH_HAND"
 
 # 第六步：生成agent视角回放视频
 python scripts/playback_robomimic_dataset.py \
     --dataset "$OUTPUT_FILE" \
     --use-obs \
     --render_image_names agentview_image \
-    --video_path "$VIDEO_PATH_AGENT" \
-    --n 1
+    --video_path "$VIDEO_PATH_AGENT"
 
 echo "所有处理步骤已完成！"
