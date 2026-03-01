@@ -12,6 +12,7 @@ import robomimic.models.base_nets as BaseNets
 import mimicplay.models.policy_nets as PolicyNets
 import robomimic.utils.tensor_utils as TensorUtils
 import robomimic.utils.obs_utils as ObsUtils
+import robomimic.utils.torch_utils as TorchUtils
 
 import mimicplay.utils.file_utils as FileUtils
 from mimicplay.algo import register_algo_factory_func, PolicyAlgo
@@ -207,6 +208,21 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
             log_probs=-action_loss,
             action_loss=action_loss,
         )
+
+    def _train_step(self, losses):
+        """
+        Override to add gradient clipping for highlevel (prevents gradient explosion).
+        """
+        info = OrderedDict()
+        max_grad_norm = getattr(self.algo_config, "gradient_clip_norm", None)
+        policy_grad_norms = TorchUtils.backprop_for_loss(
+            net=self.nets["policy"],
+            optim=self.optimizers["policy"],
+            loss=losses["action_loss"],
+            max_grad_norm=max_grad_norm,
+        )
+        info["policy_grad_norms"] = policy_grad_norms
+        return info
 
     def log_info(self, info):
         """

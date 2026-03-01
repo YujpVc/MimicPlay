@@ -120,3 +120,6 @@ class MimicPlayConfig(BaseConfig):
         self.algo.playdata.eval_goal_gap = 150                  # goal image sampling gap during evaluation rollouts (mid of training goal_image_range)
         self.algo.playdata.do_not_lock_keys()
 
+        # gradient clipping (None = no clipping; set e.g. 1.0 to prevent gradient explosion in highlevel)
+        self.algo.gradient_clip_norm = None
+

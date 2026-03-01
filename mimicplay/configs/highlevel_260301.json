@@ -7,7 +7,7 @@
             "terminal_output_to_txt": true,
             "log_tb": true,
             "log_wandb": true,
-            "wandb_proj_name": "mimicplay_original_highlevel"
+            "wandb_proj_name": "mimicplay_cube_highlevel"
         },
         "save": {
             "enabled": true,
@@ -16,14 +16,14 @@
             "epochs": [],
             "on_best_validation": true,
             "on_best_rollout_return": false,
-            "on_best_rollout_success_rate": true
+            "on_best_rollout_success_rate": false
         },
         "epoch_every_n_steps": 100,
         "validation_epoch_every_n_steps": 10,
         "env": null,
         "additional_envs": null,
         "render": false,
-        "render_video": true,
+        "render_video": false,
         "keep_all_videos": false,
         "video_skip": 5,
         "rollout": {
@@ -37,7 +37,7 @@
     },
     "train": {
         "data": null,
-        "output_dir": "/home/yujp/MimicPlay_o/trained_models_highlevel",
+        "output_dir": "/home/yujp/MimicPlay_o/trained_models_highlevel_cube",
         "num_data_workers": 2,
         "hdf5_cache_mode": "low_dim",
         "hdf5_use_swmr": true,
@@ -61,7 +61,7 @@
         "optim_params": {
             "policy": {
                 "learning_rate": {
-                    "initial": 0.0001,
+                    "initial": 1e-4,
                     "decay_factor": 0.1,
                     "epoch_schedule": []
                 },
@@ -70,6 +70,7 @@
                 }
             }
         },
+        "gradient_clip_norm": 2000000.0,
         "loss": {
             "l2_weight": 1.0,
             "l1_weight": 0.4,
@@ -163,8 +164,8 @@
         },
         "playdata": {
             "enabled": true,
-            "goal_image_range": [100, 200],
-            "eval_goal_gap": 150
+            "goal_image_range": [80, 120],
+            "eval_goal_gap": 100
         }
     },
     "observation": {

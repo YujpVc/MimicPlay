@@ -50,9 +50,16 @@ import json
 import h5py
 import imageio
 import numpy as np
+import os
 from copy import deepcopy
 
 import torch
+
+# Use local robomimic if present (for robomimic.models.transformers etc.)
+_robomimic_path = os.path.expanduser("~/robomimic")
+if os.path.exists(_robomimic_path):
+    import sys
+    sys.path.insert(0, _robomimic_path)
 
 import robomimic
 import mimicplay.utils.file_utils as FileUtils

@@ -7,7 +7,7 @@
             "terminal_output_to_txt": true,
             "log_tb": true,
             "log_wandb": true,
-            "wandb_proj_name": "mimicplay_original_highlevel"
+            "wandb_proj_name": "mimicplay_cube_lowlevel"
         },
         "save": {
             "enabled": true,
@@ -16,28 +16,28 @@
             "epochs": [],
             "on_best_validation": true,
             "on_best_rollout_return": false,
-            "on_best_rollout_success_rate": true
+            "on_best_rollout_success_rate": false
         },
         "epoch_every_n_steps": 100,
         "validation_epoch_every_n_steps": 10,
         "env": null,
         "additional_envs": null,
         "render": false,
-        "render_video": true,
+        "render_video": false,
         "keep_all_videos": false,
         "video_skip": 5,
         "rollout": {
             "enabled": false,
             "n": 10,
             "horizon": 1600,
-            "rate": 10,
+            "rate": 50,
             "warmstart": 0,
             "terminate_on_success": true
         }
     },
     "train": {
         "data": null,
-        "output_dir": "/home/yujp/MimicPlay_o/trained_models_highlevel",
+        "output_dir": "/home/yujp/MimicPlay_o/trained_models_lowlevel_cube",
         "num_data_workers": 2,
         "hdf5_cache_mode": "low_dim",
         "hdf5_use_swmr": true,
@@ -45,7 +45,7 @@
         "hdf5_load_next_obs": false,
         "hdf5_filter_key": "train",
         "hdf5_validation_filter_key": "valid",
-        "seq_length": 1,
+        "seq_length": 10,
         "dataset_keys": [
             "actions",
             "rewards",
@@ -130,7 +130,7 @@
             ]
         },
         "rnn": {
-            "enabled": false,
+            "enabled": true,
             "horizon": 10,
             "hidden_dim": 400,
             "rnn_type": "LSTM",
@@ -146,7 +146,7 @@
             "latent_plan_dim": 400
         },
         "lowlevel": {
-            "enabled": false,
+            "enabled": true,
             "feat_dim": 656,
             "n_layer": 4,
             "n_head": 4,
@@ -157,14 +157,14 @@
             "spatial_softmax_num_kp": 64,
             "gmm_min_std": 0.0001,
             "dropout": 0.1,
-            "trained_highlevel_planner": "",
+            "trained_highlevel_planner": "/home/yujp/MimicPlay_o/trained_models_highlevel/test/20260301130248/models/model_epoch_374_best_validation_-73.82323913574218.pth",
             "eval_goal_img_window": 30,
             "eval_max_goal_img_iter": 5
         },
         "playdata": {
             "enabled": true,
-            "goal_image_range": [100, 200],
-            "eval_goal_gap": 150
+            "goal_image_range": [80, 120],
+            "eval_goal_gap": 100
         }
     },
     "observation": {
@@ -172,10 +172,12 @@
             "obs": {
                 "low_dim": [
                     "robot0_eef_pos",
-                    "robot0_eef_pos_future_traj"
+                    "robot0_eef_quat",
+                    "robot0_gripper_qpos"
                 ],
                 "rgb": [
-                    "agentview_image"
+                    "agentview_image",
+                    "robot0_eye_in_hand_image"
                 ],
                 "depth": [],
                 "scan": []
@@ -206,7 +208,7 @@
                         "pretrained": false,
                         "input_coord_conv": false
                     },
-                    "pool_class": null,
+                    "pool_class": "SpatialSoftmax",
                     "pool_kwargs": {
                         "num_kp": 32,
                         "learnable_temperature": false,
