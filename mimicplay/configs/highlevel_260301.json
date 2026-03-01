@@ -61,16 +61,16 @@
         "optim_params": {
             "policy": {
                 "learning_rate": {
-                    "initial": 1e-4,
-                    "decay_factor": 0.1,
-                    "epoch_schedule": []
+                    "initial": 5e-5,
+                    "decay_factor": 0.3,
+                    "epoch_schedule": [800, 1600, 2400]
                 },
                 "regularization": {
                     "L2": 0.0
                 }
             }
         },
-        "gradient_clip_norm": 2000.0,
+        "gradient_clip_norm": 15000.0,
         "loss": {
             "l2_weight": 1.0,
             "l1_weight": 0.4,
@@ -91,7 +91,7 @@
         "gmm": {
             "enabled": true,
             "num_modes": 5,
-            "min_std": 0.0001,
+            "min_std": 0.001,
             "std_activation": "softplus",
             "low_noise_eval": false
         },
@@ -156,7 +156,7 @@
             "action_dim": 7,
             "proprio_dim": 7,
             "spatial_softmax_num_kp": 64,
-            "gmm_min_std": 0.0001,
+            "gmm_min_std": 0.001,
             "dropout": 0.1,
             "trained_highlevel_planner": "",
             "eval_goal_img_window": 30,

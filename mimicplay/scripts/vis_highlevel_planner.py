@@ -190,11 +190,11 @@ def visualize_highlevel_planner(args):
         H, W = agentview_images[0].shape[:2]
     print(f"Image resolution: {W}x{H}, total_frames={total_frames}")
 
-    # 当 checkpoint 无归一化统计时，模型输出通常在 [-1,1]（GMM tanh），用演示的 eef 范围映射到世界坐标
+    # 当 checkpoint 无归一化统计时，记录演示 eef 范围用于诊断
     eef_min = robot0_eef_pos.min(axis=0)
     eef_max = robot0_eef_pos.max(axis=0)
     if obs_normalization_stats is None:
-        print("No obs_normalization_stats in checkpoint; assuming model output in [-1,1], will scale to demo eef range.")
+        print("No obs_normalization_stats in checkpoint; using current-eef anchored correction for tanh-compressed pred.")
         print(f"  eef range: x=[{eef_min[0]:.3f},{eef_max[0]:.3f}] y=[{eef_min[1]:.3f},{eef_max[1]:.3f}] z=[{eef_min[2]:.3f},{eef_max[2]:.3f}]")
 
     os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
@@ -265,6 +265,9 @@ def visualize_highlevel_planner(args):
                     pred_traj = lat_plan.view(-1, future_horizon, 3).cpu().numpy()[0]
 
                     if obs_normalization_stats is not None and pred_traj is not None:
+                        # 有归一化统计时，直接按训练统计量反归一化到世界坐标
+                        # 注意：当前高层网络(use_tanh=False)是对 mean 做 tanh 限幅，并非 tanh-wrapped 输出，
+                        # 因此这里不做 atanh 逆变换。
                         target_key = "robot0_eef_pos_future_traj"
                         stats = None
                         if target_key in obs_normalization_stats:
@@ -286,8 +289,8 @@ def visualize_highlevel_planner(args):
                                 std = std.reshape(future_horizon, 3)
                             pred_traj = pred_traj * std + mean
                     elif obs_normalization_stats is None and pred_traj is not None:
-                        # 模型输出为 [-1,1]（GMM tanh），线性映射到演示的 eef 范围
-                        pred_traj = (pred_traj + 1.0) * 0.5 * (eef_max - eef_min) + eef_min
+                        # 无 stats 时，直接对齐首点到当前 eef，保留预测相对轨迹以缓解 tanh 饱和带来的绝对偏差
+                        pred_traj = pred_traj - pred_traj[0:1] + curr_pos[None, :]
 
                     # 首帧诊断：确认预测值与投影点数
                     if i == 0 and pred_traj is not None:
@@ -357,7 +360,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agent",
         type=str,
-        default="/home/yujp/MimicPlay_o/trained_models_highlevel_cube/test/20260301212704/models/model_epoch_1083_best_validation_-95.50379180908203.pth",
+        default="/home/yujp/MimicPlay_o/trained_models_highlevel_cube/test/20260302035352/models/model_epoch_1426_best_validation_-91.0633544921875.pth",
         help="高层规划器 checkpoint 路径（.pth）",
     )
     parser.add_argument(

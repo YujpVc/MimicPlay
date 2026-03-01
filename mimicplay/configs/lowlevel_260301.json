@@ -61,7 +61,7 @@
         "optim_params": {
             "policy": {
                 "learning_rate": {
-                    "initial": 0.0001,
+                    "initial": 5e-6,
                     "decay_factor": 0.1,
                     "epoch_schedule": []
                 },
@@ -70,7 +70,7 @@
                 }
             }
         },
-        "gradient_clip_norm": 3500.0,
+        "gradient_clip_norm": 15000.0,
         "loss": {
             "l2_weight": 1.0,
             "l1_weight": 0.4,
@@ -91,7 +91,7 @@
         "gmm": {
             "enabled": true,
             "num_modes": 5,
-            "min_std": 0.0001,
+            "min_std": 0.001,
             "std_activation": "softplus",
             "low_noise_eval": false
         },
@@ -156,9 +156,9 @@
             "action_dim": 7,
             "proprio_dim": 7,
             "spatial_softmax_num_kp": 64,
-            "gmm_min_std": 0.0001,
+            "gmm_min_std": 0.001,
             "dropout": 0.1,
-            "trained_highlevel_planner": "/home/yujp/MimicPlay_o/trained_models_highlevel/test/20260301130248/models/model_epoch_374_best_validation_-73.82323913574218.pth",
+            "trained_highlevel_planner": "/home/yujp/MimicPlay_o/trained_models_highlevel_cube/test/20260302035352/models/model_epoch_1747_best_validation_-91.4313461303711.pth",
             "eval_goal_img_window": 30,
             "eval_max_goal_img_iter": 5
         },
