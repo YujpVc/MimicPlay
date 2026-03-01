@@ -1,7 +1,43 @@
-**/__pycache__
-*.egg-info
+# Bytecode / cache
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
 
+# Datasets (do not commit data)
 datasets/
-trained_models_highlevel
+**/datasets/
+mimicplay/datasets/
 
+# Training outputs & checkpoints (do not commit)
+trained_models_highlevel/
+trained_models_highlevel_cube/
+trained_models_lowlevel/
+trained_models_*/
+
+# Run artifacts
+**/wandb/
+**/training_result/
+training_result/
+mimicplay/training_result/
+mimicplay/wandb/
+
+# Videos / large media
 *.mp4
+*.avi
+*.mov
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Env / secrets (if any)
+.env
+.env.local

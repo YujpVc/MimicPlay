@@ -70,6 +70,7 @@
                 }
             }
         },
+        "gradient_clip_norm": 3500.0,
         "loss": {
             "l2_weight": 1.0,
             "l1_weight": 0.4,

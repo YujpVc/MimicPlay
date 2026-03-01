@@ -375,6 +375,21 @@ class Lowlevel_GPT_mimicplay(BC_RNN):
             action_loss=action_loss,
         )
 
+    def _train_step(self, losses):
+        """
+        Override to add gradient clipping for lowlevel (prevents gradient explosion).
+        """
+        info = OrderedDict()
+        max_grad_norm = getattr(self.algo_config, "gradient_clip_norm", None)
+        policy_grad_norms = TorchUtils.backprop_for_loss(
+            net=self.nets["policy"],
+            optim=self.optimizers["policy"],
+            loss=losses["action_loss"],
+            max_grad_norm=max_grad_norm,
+        )
+        info["policy_grad_norms"] = policy_grad_norms
+        return info
+
     def log_info(self, info):
         """
         Process info dictionary from @train_on_batch to summarize
