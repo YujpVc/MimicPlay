@@ -297,7 +297,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=100,
+        default=1,
         help="number of rollouts",
     )
 
